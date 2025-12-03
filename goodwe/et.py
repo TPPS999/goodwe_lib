@@ -362,6 +362,7 @@ class ET(Inverter):
         Integer("battery_discharge_depth_offline", 45358, "Battery Discharge Depth (off-line)", "%", Kind.BAT),
 
         Decimal("power_factor", 45482, 100, "Power Factor"),
+        IntegerS("fixed_reactive_power", 45483, "Fixed Reactive Power", "‰", Kind.GRID),
 
         Integer("work_mode", 47000, "Work Mode", "", Kind.AC),
         Integer("dred", 47010, "DRED/Remote Shutdown", "", Kind.AC),
@@ -376,6 +377,8 @@ class ET(Inverter):
         Integer("ems_power", 47512, "EMS Power", "W", Kind.BAT),
 
         Integer("battery_protocol_code", 47514, "Battery Protocol Code", "", Kind.BAT),
+
+        Integer("fixed_q_power_flag", 45542, "Fixed Q Power Flag", "", Kind.GRID),
 
         EcoModeV1("eco_mode_1", 47515, "Eco Mode Group 1"),
         ByteH("eco_mode_1_switch", 47518, "Eco Mode Group 1 Switch"),
