@@ -363,6 +363,7 @@ class ET(Inverter):
 
         Decimal("power_factor", 45482, 100, "Power Factor"),
         IntegerS("fixed_reactive_power", 45483, "Fixed Reactive Power", "‰", Kind.GRID),
+        Integer("fixed_q_power_flag", 45542, "Fixed Q Power Flag", "", Kind.GRID),
 
         Integer("work_mode", 47000, "Work Mode", "", Kind.AC),
         Integer("dred", 47010, "DRED/Remote Shutdown", "", Kind.AC),
