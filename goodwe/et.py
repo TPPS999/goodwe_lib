@@ -379,8 +379,7 @@ class ET(Inverter):
 
         Integer("battery_protocol_code", 47514, "Battery Protocol Code", "", Kind.BAT),
 
-        Integer("fixed_q_power_flag", 45542, "Fixed Q Power Flag", "", Kind.GRID),
-
+       
         EcoModeV1("eco_mode_1", 47515, "Eco Mode Group 1"),
         ByteH("eco_mode_1_switch", 47518, "Eco Mode Group 1 Switch"),
         EcoModeV1("eco_mode_2", 47519, "Eco Mode Group 2"),
