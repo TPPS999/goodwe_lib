@@ -131,3 +131,5 @@ dmypy.json
 # PyCharm
 .idea
 
+# Documentation files (local only)
+*.docx
