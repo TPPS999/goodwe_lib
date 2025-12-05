@@ -9,7 +9,8 @@ PLATFORM_745_HV_MODELS = ("ETT", "HTA", "HUB", "AEB", "SPB", "CUB", "EUB", "HEB"
 PLATFORM_753_MODELS = ("AES", "HHI", "ABP", "EHB", "HSB", "HUA", "CUA")
 
 ET_MODEL_TAGS = PLATFORM_205_MODELS + PLATFORM_745_LV_MODELS + PLATFORM_745_HV_MODELS + PLATFORM_753_MODELS + (
-    "ETC", "BTC", "BTN")  # Qianhai
+    "ETC", "BTC", "BTN",  # Qianhai
+    "40KET", "50KET")  # High power ET models
 ES_MODEL_TAGS = PLATFORM_105_MODELS
 DT_MODEL_TAGS = ("DTU", "DTS",
                  "MSU", "MST", "MSC", "DSN", "DTN", "DST", "NSU", "SSN", "SST", "SSX", "SSY",
@@ -22,9 +23,9 @@ SINGLE_PHASE_MODELS = ("DSN", "DST", "NSU", "SSN", "SST", "SSX", "SSY",  # DT
                        "ESN", "EMN", "ERN", "EBN", "HLB", "HMB", "HBB", "SPN")  # ES Gen 2
 
 MPPT3_MODELS = ("MSU", "MST", "PSC", "MSC",
-                "25KET", "29K9ET", "25KMT")
+                "25KET", "29K9ET", "25KMT", "40KET")
 
-MPPT4_MODELS = ("HSB",)
+MPPT4_MODELS = ("HSB", "50KET")
 
 BAT_2_MODELS = ("25KET", "29K9ET")
 

@@ -7,7 +7,7 @@ from .const import *
 from .exceptions import RequestFailedException, RequestRejectedException
 from .inverter import Inverter, OperationMode, SensorKind as Kind
 from .modbus import ILLEGAL_DATA_ADDRESS
-from .model import is_2_battery, is_4_mppt, is_745_platform, is_single_phase
+from .model import is_2_battery, is_3_mppt, is_4_mppt, is_745_platform, is_single_phase
 from .protocol import ProtocolCommand
 from .sensor import *
 
@@ -529,8 +529,12 @@ class ET(Inverter):
         self.firmware = self._decode(response[42:54])  # 35021 - 35027
         self.arm_firmware = self._decode(response[54:66])  # 35027 - 35032
 
-        if not is_4_mppt(self) and self.rated_power < 15000:
-            # This inverter does not have 4 MPPTs or PV strings
+        # Filter PV sensors based on MPPT count
+        if is_3_mppt(self):
+            # 3 MPPT inverters have PV1-3, filter out PV4
+            self._sensors = tuple(filter(lambda s: not ('pv4' in s.id_), self._sensors))
+        elif not is_4_mppt(self) and self.rated_power < 15000:
+            # Small inverters (< 15kW) without explicit 3/4 MPPT have only PV1-2
             self._sensors = tuple(filter(lambda s: not ('pv4' in s.id_), self._sensors))
             self._sensors = tuple(filter(lambda s: not ('pv3' in s.id_), self._sensors))
 
