@@ -530,13 +530,18 @@ class ET(Inverter):
         self.arm_firmware = self._decode(response[54:66])  # 35027 - 35032
 
         # Filter PV sensors based on MPPT count
+        # Each MPPT has 2 PV inputs: MPPT1->PV1+PV2, MPPT2->PV3+PV4, MPPT3->PV5+PV6, MPPT4->PV7+PV8
         if is_3_mppt(self):
-            # 3 MPPT inverters have PV1-3, filter out PV4
-            self._sensors = tuple(filter(lambda s: not ('pv4' in s.id_), self._sensors))
+            # 3 MPPT inverters (e.g. ET40): PV1-6, filter out PV4 from main sensors and PV7-16 from MPPT sensors
+            self._sensors = tuple(filter(lambda s: 'pv4' not in s.id_, self._sensors))
+            self._sensors_mppt = tuple(filter(lambda s: not any(f'pv{i}' in s.id_ for i in range(7, 17)), self._sensors_mppt))
+        elif is_4_mppt(self):
+            # 4 MPPT inverters (e.g. ET50): PV1-8, filter out PV9-16 from MPPT sensors
+            self._sensors_mppt = tuple(filter(lambda s: not any(f'pv{i}' in s.id_ for i in range(9, 17)), self._sensors_mppt))
         elif not is_4_mppt(self) and self.rated_power < 15000:
-            # Small inverters (< 15kW) without explicit 3/4 MPPT have only PV1-2
-            self._sensors = tuple(filter(lambda s: not ('pv4' in s.id_), self._sensors))
-            self._sensors = tuple(filter(lambda s: not ('pv3' in s.id_), self._sensors))
+            # Small inverters (< 15kW) without explicit 3/4 MPPT: PV1-4 only (2 MPPT assumed)
+            self._sensors = tuple(filter(lambda s: 'pv4' not in s.id_, self._sensors))
+            self._sensors = tuple(filter(lambda s: 'pv3' not in s.id_, self._sensors))
 
         if is_single_phase(self):
             # this is single phase inverter, filter out all L2 and L3 sensors
