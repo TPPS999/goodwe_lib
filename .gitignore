@@ -131,6 +131,3 @@ dmypy.json
 # PyCharm
 .idea
 
-# Version file needed for CI publishing
-VERSION
-
