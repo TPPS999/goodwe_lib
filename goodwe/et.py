@@ -811,9 +811,27 @@ class ET(Inverter):
                     logger.info("Extended meter values not supported, disabling further attempts.")
                     self._has_meter_extended2 = False
                     self._sensors_meter = tuple(filter(self._not_extended_meter2, self._sensors_meter))
-                    response = await self._read_from_socket(self._READ_METER_DATA_EXTENDED)
-                    data.update(
-                        self._map_response(response, self._sensors_meter))
+                    try:
+                        response = await self._read_from_socket(self._READ_METER_DATA_EXTENDED)
+                        data.update(
+                            self._map_response(response, self._sensors_meter))
+                    except RequestRejectedException as ex2:
+                        if ex2.message == ILLEGAL_DATA_ADDRESS:
+                            logger.info("Extended meter values not supported, disabling further attempts.")
+                            self._has_meter_extended = False
+                            self._sensors_meter = tuple(filter(self._not_extended_meter, self._sensors_meter))
+                            try:
+                                response = await self._read_from_socket(self._READ_METER_DATA)
+                                data.update(
+                                    self._map_response(response, self._sensors_meter))
+                            except RequestRejectedException as ex3:
+                                if ex3.message == ILLEGAL_DATA_ADDRESS:
+                                    logger.info("Meter values not supported, disabling further attempts.")
+                                    self._has_meter = False
+                                else:
+                                    raise ex3
+                        else:
+                            raise ex2
                 else:
                     raise ex
         elif self._has_meter and self._has_meter_extended:
@@ -825,9 +843,16 @@ class ET(Inverter):
                     logger.info("Extended meter values not supported, disabling further attempts.")
                     self._has_meter_extended = False
                     self._sensors_meter = tuple(filter(self._not_extended_meter, self._sensors_meter))
-                    response = await self._read_from_socket(self._READ_METER_DATA)
-                    data.update(
-                        self._map_response(response, self._sensors_meter))
+                    try:
+                        response = await self._read_from_socket(self._READ_METER_DATA)
+                        data.update(
+                            self._map_response(response, self._sensors_meter))
+                    except RequestRejectedException as ex2:
+                        if ex2.message == ILLEGAL_DATA_ADDRESS:
+                            logger.info("Meter values not supported, disabling further attempts.")
+                            self._has_meter = False
+                        else:
+                            raise ex2
                 else:
                     raise ex
         elif self._has_meter:
