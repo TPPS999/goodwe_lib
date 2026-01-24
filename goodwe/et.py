@@ -153,6 +153,11 @@ class ET(Inverter):
                    read_bytes2_signed(data, 35140),
                    "House Consumption", "W", Kind.AC),
 
+        # Inverter identification - added manually in read_runtime_data()
+        Calculated("serial_number",
+                   lambda data: "",
+                   "Serial Number", ""),
+
         # Power4S("pbattery2", 35264, "Battery2 Power", Kind.BAT),
         # Integer("battery2_mode", 35266, "Battery2 Mode code", "", Kind.BAT),
         # Enum2("battery2_mode_label", 35184, BATTERY_MODES, "Battery2 Mode", Kind.BAT),
@@ -426,7 +431,6 @@ class ET(Inverter):
 
         Integer("battery_protocol_code", 47514, "Battery Protocol Code", "", Kind.BAT),
 
-       
         EcoModeV1("eco_mode_1", 47515, "Eco Mode Group 1"),
         ByteH("eco_mode_1_switch", 47518, "Eco Mode Group 1 Switch"),
         EcoModeV1("eco_mode_2", 47519, "Eco Mode Group 2"),
@@ -435,6 +439,13 @@ class ET(Inverter):
         ByteH("eco_mode_3_switch", 47526, "Eco Mode Group 3 Switch"),
         EcoModeV1("eco_mode_4", 47527, "Eco Mode Group 4"),
         ByteH("eco_mode_4_switch", 47530, "Eco Mode Group 4 Switch"),
+
+        Integer("force_charge_soc_start", 47531, "Force Charge Start SoC", "%", Kind.BAT),
+        Integer("force_charge_soc_stop", 47532, "Force Charge Stop SoC", "%", Kind.BAT),
+        Integer("clear_eco_time", 47533, "Clear ECO Time Settings", "", Kind.BAT),
+
+        Integer("wifi_reset", 47539, "WiFi Reset", "", Kind.AC),
+        Integer("wifi_reload", 47541, "WiFi Reload", "", Kind.AC),
 
         # Direct BMS communication for EMS Control
         Integer("bms_version", 47900, "BMS Version"),
@@ -512,8 +523,98 @@ class ET(Inverter):
         Integer("load_control_soc", 47597, "Load Control SoC", "", Kind.AC),
         Integer("hardware_feed_power", 47599, "Hardware Feed Power"),
         Integer("pcs_powersave_mode", 47600, "PCS Powersave Mode", "", Kind.BAT),
+        Integer("old_meter_protocol", 47601, "Old Meter Protocol", "", Kind.GRID),
 
         Integer("fast_charging_power", 47603, "Fast Charging Power", "%", Kind.BAT),
+        Integer("load_regulation_generator_flag", 47604, "Load Regulation or Generator Flag", "", Kind.AC),
+
+        Integer("pv_sell_first", 47613, "PV Sell First", "", Kind.PV),
+        Integer("bat_feedpower_offset", 47614, "Battery FeedPower Offset", "W", Kind.BAT),
+        Integer("battery_current_coff", 47615, "Battery Current Coefficient", "%", Kind.BAT),
+        Integer("parallel_strong_charge_power", 47616, "Parallel Strong Charge Power", "‰", Kind.BAT),
+
+        Integer("battery2_protocol_code", 47618, "Battery2 Protocol Code", "", Kind.BAT),
+
+        # Feed Power Schedule - 24 time slots for export power limitation
+        Long("feed_power_start_time_1", 47619, "Feed Power Start Time 1", "s", Kind.GRID),
+        LongS("feed_power_limit_1", 47621, "Feed Power Limit 1", "W", Kind.GRID),
+        Integer("feed_power_period_1", 47623, "Feed Power Period 1", "s", Kind.GRID),
+        Long("feed_power_start_time_2", 47624, "Feed Power Start Time 2", "s", Kind.GRID),
+        LongS("feed_power_limit_2", 47626, "Feed Power Limit 2", "W", Kind.GRID),
+        Integer("feed_power_period_2", 47628, "Feed Power Period 2", "s", Kind.GRID),
+        Long("feed_power_start_time_3", 47629, "Feed Power Start Time 3", "s", Kind.GRID),
+        LongS("feed_power_limit_3", 47631, "Feed Power Limit 3", "W", Kind.GRID),
+        Integer("feed_power_period_3", 47633, "Feed Power Period 3", "s", Kind.GRID),
+        Long("feed_power_start_time_4", 47634, "Feed Power Start Time 4", "s", Kind.GRID),
+        LongS("feed_power_limit_4", 47636, "Feed Power Limit 4", "W", Kind.GRID),
+        Integer("feed_power_period_4", 47638, "Feed Power Period 4", "s", Kind.GRID),
+        Long("feed_power_start_time_5", 47639, "Feed Power Start Time 5", "s", Kind.GRID),
+        LongS("feed_power_limit_5", 47641, "Feed Power Limit 5", "W", Kind.GRID),
+        Integer("feed_power_period_5", 47643, "Feed Power Period 5", "s", Kind.GRID),
+        Long("feed_power_start_time_6", 47644, "Feed Power Start Time 6", "s", Kind.GRID),
+        LongS("feed_power_limit_6", 47646, "Feed Power Limit 6", "W", Kind.GRID),
+        Integer("feed_power_period_6", 47648, "Feed Power Period 6", "s", Kind.GRID),
+        Long("feed_power_start_time_7", 47649, "Feed Power Start Time 7", "s", Kind.GRID),
+        LongS("feed_power_limit_7", 47651, "Feed Power Limit 7", "W", Kind.GRID),
+        Integer("feed_power_period_7", 47653, "Feed Power Period 7", "s", Kind.GRID),
+        Long("feed_power_start_time_8", 47654, "Feed Power Start Time 8", "s", Kind.GRID),
+        LongS("feed_power_limit_8", 47656, "Feed Power Limit 8", "W", Kind.GRID),
+        Integer("feed_power_period_8", 47658, "Feed Power Period 8", "s", Kind.GRID),
+        Long("feed_power_start_time_9", 47659, "Feed Power Start Time 9", "s", Kind.GRID),
+        LongS("feed_power_limit_9", 47661, "Feed Power Limit 9", "W", Kind.GRID),
+        Integer("feed_power_period_9", 47663, "Feed Power Period 9", "s", Kind.GRID),
+        Long("feed_power_start_time_10", 47664, "Feed Power Start Time 10", "s", Kind.GRID),
+        LongS("feed_power_limit_10", 47666, "Feed Power Limit 10", "W", Kind.GRID),
+        Integer("feed_power_period_10", 47668, "Feed Power Period 10", "s", Kind.GRID),
+        Long("feed_power_start_time_11", 47669, "Feed Power Start Time 11", "s", Kind.GRID),
+        LongS("feed_power_limit_11", 47671, "Feed Power Limit 11", "W", Kind.GRID),
+        Integer("feed_power_period_11", 47673, "Feed Power Period 11", "s", Kind.GRID),
+        Long("feed_power_start_time_12", 47674, "Feed Power Start Time 12", "s", Kind.GRID),
+        LongS("feed_power_limit_12", 47676, "Feed Power Limit 12", "W", Kind.GRID),
+        Integer("feed_power_period_12", 47678, "Feed Power Period 12", "s", Kind.GRID),
+        Long("feed_power_start_time_13", 47679, "Feed Power Start Time 13", "s", Kind.GRID),
+        LongS("feed_power_limit_13", 47681, "Feed Power Limit 13", "W", Kind.GRID),
+        Integer("feed_power_period_13", 47683, "Feed Power Period 13", "s", Kind.GRID),
+        Long("feed_power_start_time_14", 47684, "Feed Power Start Time 14", "s", Kind.GRID),
+        LongS("feed_power_limit_14", 47686, "Feed Power Limit 14", "W", Kind.GRID),
+        Integer("feed_power_period_14", 47688, "Feed Power Period 14", "s", Kind.GRID),
+        Long("feed_power_start_time_15", 47689, "Feed Power Start Time 15", "s", Kind.GRID),
+        LongS("feed_power_limit_15", 47691, "Feed Power Limit 15", "W", Kind.GRID),
+        Integer("feed_power_period_15", 47693, "Feed Power Period 15", "s", Kind.GRID),
+        Long("feed_power_start_time_16", 47694, "Feed Power Start Time 16", "s", Kind.GRID),
+        LongS("feed_power_limit_16", 47696, "Feed Power Limit 16", "W", Kind.GRID),
+        Integer("feed_power_period_16", 47698, "Feed Power Period 16", "s", Kind.GRID),
+        Long("feed_power_start_time_17", 47699, "Feed Power Start Time 17", "s", Kind.GRID),
+        LongS("feed_power_limit_17", 47701, "Feed Power Limit 17", "W", Kind.GRID),
+        Integer("feed_power_period_17", 47703, "Feed Power Period 17", "s", Kind.GRID),
+        Long("feed_power_start_time_18", 47704, "Feed Power Start Time 18", "s", Kind.GRID),
+        LongS("feed_power_limit_18", 47706, "Feed Power Limit 18", "W", Kind.GRID),
+        Integer("feed_power_period_18", 47708, "Feed Power Period 18", "s", Kind.GRID),
+        Long("feed_power_start_time_19", 47709, "Feed Power Start Time 19", "s", Kind.GRID),
+        LongS("feed_power_limit_19", 47711, "Feed Power Limit 19", "W", Kind.GRID),
+        Integer("feed_power_period_19", 47713, "Feed Power Period 19", "s", Kind.GRID),
+        Long("feed_power_start_time_20", 47714, "Feed Power Start Time 20", "s", Kind.GRID),
+        LongS("feed_power_limit_20", 47716, "Feed Power Limit 20", "W", Kind.GRID),
+        Integer("feed_power_period_20", 47718, "Feed Power Period 20", "s", Kind.GRID),
+        Long("feed_power_start_time_21", 47719, "Feed Power Start Time 21", "s", Kind.GRID),
+        LongS("feed_power_limit_21", 47721, "Feed Power Limit 21", "W", Kind.GRID),
+        Integer("feed_power_period_21", 47723, "Feed Power Period 21", "s", Kind.GRID),
+        Long("feed_power_start_time_22", 47724, "Feed Power Start Time 22", "s", Kind.GRID),
+        LongS("feed_power_limit_22", 47726, "Feed Power Limit 22", "W", Kind.GRID),
+        Integer("feed_power_period_22", 47728, "Feed Power Period 22", "s", Kind.GRID),
+        Long("feed_power_start_time_23", 47729, "Feed Power Start Time 23", "s", Kind.GRID),
+        LongS("feed_power_limit_23", 47731, "Feed Power Limit 23", "W", Kind.GRID),
+        Integer("feed_power_period_23", 47733, "Feed Power Period 23", "s", Kind.GRID),
+        Long("feed_power_start_time_24", 47734, "Feed Power Start Time 24", "s", Kind.GRID),
+        LongS("feed_power_limit_24", 47736, "Feed Power Limit 24", "W", Kind.GRID),
+        Integer("feed_power_period_24", 47738, "Feed Power Period 24", "s", Kind.GRID),
+
+        # SAPN (South Australian Power Networks) settings
+        Integer("sapn_up_rate", 47739, "SAPN Up Rate", "%Pn/min", Kind.GRID),
+        Integer("sapn_down_rate", 47740, "SAPN Down Rate", "%Pn/min", Kind.GRID),
+        LongS("sapn_feed_power_preset", 47741, "SAPN Feed Power Preset", "W", Kind.GRID),
+        Integer("single_battery_paral_enable", 47743, "Single Battery Parallel Enable", "", Kind.BAT),
+        Integer("battery_busbar_mode", 47744, "Battery Busbar Mode", "", Kind.BAT),
     )
 
     # Settings added in ARM firmware 22
@@ -562,6 +663,7 @@ class ET(Inverter):
         self._has_peak_shaving: bool = True
         self._has_battery: bool = True
         self._has_battery2: bool = False
+        self._has_meter: bool = True
         self._has_meter_extended: bool = False
         self._has_meter_extended2: bool = False
         self._has_mppt: bool = False
@@ -700,7 +802,7 @@ class ET(Inverter):
                 else:
                     raise ex
 
-        if self._has_meter_extended2:
+        if self._has_meter and self._has_meter_extended2:
             try:
                 response = await self._read_from_socket(self._READ_METER_DATA_EXTENDED2)
                 data.update(self._map_response(response, self._sensors_meter))
@@ -714,7 +816,7 @@ class ET(Inverter):
                         self._map_response(response, self._sensors_meter))
                 else:
                     raise ex
-        elif self._has_meter_extended:
+        elif self._has_meter and self._has_meter_extended:
             try:
                 response = await self._read_from_socket(self._READ_METER_DATA_EXTENDED)
                 data.update(self._map_response(response, self._sensors_meter))
@@ -728,9 +830,16 @@ class ET(Inverter):
                         self._map_response(response, self._sensors_meter))
                 else:
                     raise ex
-        else:
-            response = await self._read_from_socket(self._READ_METER_DATA)
-            data.update(self._map_response(response, self._sensors_meter))
+        elif self._has_meter:
+            try:
+                response = await self._read_from_socket(self._READ_METER_DATA)
+                data.update(self._map_response(response, self._sensors_meter))
+            except RequestRejectedException as ex:
+                if ex.message == ILLEGAL_DATA_ADDRESS:
+                    logger.info("Meter values not supported, disabling further attempts.")
+                    self._has_meter = False
+                else:
+                    raise ex
 
         if self._has_mppt:
             try:
@@ -753,6 +862,9 @@ class ET(Inverter):
                     self._has_parallel = False
                 else:
                     raise ex
+
+        # Add inverter serial number as a constant sensor value
+        data["serial_number"] = self.serial_number
 
         return data
 
