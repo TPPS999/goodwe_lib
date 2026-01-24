@@ -338,6 +338,52 @@ class ET(Inverter):
         Apparent4("apparent_power3", 35363, "Apparent Power L3", Kind.GRID),
     )
 
+    # Parallel inverter system data
+    # Modbus registers from offset 0x28a0 (10400)
+    __all_sensors_parallel: tuple[Sensor, ...] = (
+        Integer("parallel_inverter_quantity", 10400, "Inverter Quantity", "", Kind.AC),
+        Integer("parallel_firmware_version_arm", 10401, "Firmware Version ARM", "", Kind.AC),
+        Integer("parallel_firmware_version_dsp_master", 10402, "Firmware Version DSP Master", "", Kind.AC),
+        Integer("parallel_firmware_version_dsp_slave", 10403, "Firmware Version DSP Slave", "", Kind.AC),
+        Integer("parallel_online_quantity", 10404, "Online Quantity", "", Kind.AC),
+        Integer("parallel_app_mode", 10405, "APP Mode", "", Kind.AC),
+        Integer("parallel_safety_country", 10406, "Safety Country", "", Kind.AC),
+        Integer("parallel_work_mode", 10407, "Work Mode", "", Kind.AC),
+        Integer("parallel_meter_comm_status", 10408, "Meter Comm Status", "", Kind.GRID),
+        Integer("parallel_backup_enable", 10409, "BackUp Enable", "", Kind.UPS),
+        Integer("parallel_controller_status_code", 10410, "Controller Status Code", "", Kind.AC),
+        # 10411 reserved
+        Power4("parallel_pv_total_power", 10412, "PV Total Power", Kind.PV),
+        Power4S("parallel_battery_total_power", 10414, "Battery Total Power", Kind.BAT),
+        Power4S("parallel_total_backup_load_power", 10416, "Total Back-Up Load Power", Kind.UPS),
+        Power4S("parallel_meter_power", 10418, "Meter Power", Kind.GRID),
+        Power4S("parallel_total_inverter_power", 10420, "Total Inverter Power", Kind.AC),
+        Power4S("parallel_r_phase_inverter_power", 10422, "R Phase Inverter Power", Kind.AC),
+        Power4S("parallel_s_phase_inverter_power", 10424, "S Phase Inverter Power", Kind.AC),
+        Power4S("parallel_t_phase_inverter_power", 10426, "T Phase Inverter Power", Kind.AC),
+        Power4S("parallel_backup_active_power_r", 10428, "Back-Up Active Power R", Kind.UPS),
+        Power4S("parallel_backup_active_power_s", 10430, "Back-Up Active Power S", Kind.UPS),
+        Power4S("parallel_backup_active_power_t", 10432, "Back-Up Active Power T", Kind.UPS),
+        Decimal("parallel_meter_frequency", 10434, 100, "Meter Frequency", "Hz", Kind.GRID),
+        Integer("parallel_battery_mode", 10435, "Battery Mode", "", Kind.BAT),
+        Decimal("parallel_battery_voltage_1", 10436, 10, "Battery Voltage 1", "V", Kind.BAT),
+        Decimal("parallel_battery_voltage_2", 10437, 10, "Battery Voltage 2", "V", Kind.BAT),
+        Power4("parallel_total_inverter_power_rated", 10438, "Total Inverter Power (rated)", Kind.AC),
+        # 10439-10469 reserved
+        Integer("parallel_meter_check_value", 10470, "Meter Check Value", "", Kind.GRID),
+        Integer("parallel_meter_connect_check_flag", 10471, "Meter Connect Check Flag", "", Kind.GRID),
+        Integer("parallel_soc", 10472, "SOC", "%", Kind.BAT),
+        Integer("parallel_battery_capacity", 10473, "Battery Capacity", "Ah", Kind.BAT),
+        Integer("parallel_battery_communication", 10474, "Battery Communication Status", "", Kind.BAT),
+        # 10475 reserved
+        Energy4W("parallel_battery_charge_allow_kwh", 10476, "Battery Charge Allow kWh", Kind.BAT),
+        Energy4W("parallel_battery_discharge_allow_kwh", 10478, "Battery Discharge Allow kWh", Kind.BAT),
+        Integer("parallel_able_balance_flag", 10480, "Able Balance Flag", "", Kind.BAT),
+        Power4S("parallel_meter_active_power_r", 10481, "Meter Active Power R", Kind.GRID),
+        Power4S("parallel_meter_active_power_s", 10483, "Meter Active Power S", Kind.GRID),
+        Power4S("parallel_meter_active_power_t", 10485, "Meter Active Power T", Kind.GRID),
+    )
+
     # Modbus registers of inverter settings, offsets are modbus register addresses
     __all_settings: tuple[Sensor, ...] = (
         Integer("comm_address", 45127, "Communication Address", ""),
@@ -511,6 +557,7 @@ class ET(Inverter):
         self._READ_BATTERY_INFO: ProtocolCommand = self._read_command(0x9088, 0x0018)
         self._READ_BATTERY2_INFO: ProtocolCommand = self._read_command(0x9858, 0x0016)
         self._READ_MPPT_DATA: ProtocolCommand = self._read_command(0x89e5, 0x3d)
+        self._READ_PARALLEL_DATA: ProtocolCommand = self._read_command(0x28a0, 0x56)
         self._has_eco_mode_v2: bool = True
         self._has_peak_shaving: bool = True
         self._has_battery: bool = True
@@ -518,11 +565,13 @@ class ET(Inverter):
         self._has_meter_extended: bool = False
         self._has_meter_extended2: bool = False
         self._has_mppt: bool = False
+        self._has_parallel: bool = False
         self._sensors = self.__all_sensors
         self._sensors_battery = self.__all_sensors_battery
         self._sensors_battery2 = self.__all_sensors_battery2
         self._sensors_meter = self.__all_sensors_meter
         self._sensors_mppt = self.__all_sensors_mppt
+        self._sensors_parallel = self.__all_sensors_parallel
         self._settings: dict[str, Sensor] = {s.id_: s for s in self.__all_settings}
         self._sensors_map: dict[str, Sensor] | None = None
 
@@ -611,6 +660,19 @@ class ET(Inverter):
             logger.debug("Cannot read _has_peak_shaving settings, disabling it.")
             self._has_peak_shaving = False
 
+        # Check for parallel inverter system support
+        try:
+            response = await self._read_from_socket(self._read_command(10400, 1))
+            inverter_quantity = int.from_bytes(response.read(2), byteorder="big", signed=False)
+            if inverter_quantity > 1:
+                logger.info("Parallel inverter system detected with %d inverters.", inverter_quantity)
+                self._has_parallel = True
+            else:
+                logger.debug("Single inverter system, parallel sensors not needed.")
+        except (RequestRejectedException, RequestFailedException) as ex:
+            logger.debug("Parallel system registers not supported: %s", ex)
+            self._has_parallel = False
+
     async def read_runtime_data(self) -> dict[str, Any]:
         response = await self._read_from_socket(self._READ_RUNNING_DATA)
         data = self._map_response(response, self._sensors)
@@ -678,6 +740,17 @@ class ET(Inverter):
                 if ex.message == ILLEGAL_DATA_ADDRESS:
                     logger.info("MPPT values not supported, disabling further attempts.")
                     self._has_mppt = False
+                else:
+                    raise ex
+
+        if self._has_parallel:
+            try:
+                response = await self._read_from_socket(self._READ_PARALLEL_DATA)
+                data.update(self._map_response(response, self._sensors_parallel))
+            except RequestRejectedException as ex:
+                if ex.message == ILLEGAL_DATA_ADDRESS:
+                    logger.info("Parallel system values not supported, disabling further attempts.")
+                    self._has_parallel = False
                 else:
                     raise ex
 
@@ -851,6 +924,8 @@ class ET(Inverter):
             result = result + self._sensors_battery2
         if self._has_mppt:
             result = result + self._sensors_mppt
+        if self._has_parallel:
+            result = result + self._sensors_parallel
         return result
 
     def settings(self) -> tuple[Sensor, ...]:
