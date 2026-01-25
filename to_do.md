@@ -1,7 +1,7 @@
 # Plan działania - goodwe_lib
 
 **Data rozpoczęcia:** 2026-01-24 18:32
-**Ostatnia aktualizacja:** 2026-01-25 02:33
+**Ostatnia aktualizacja:** 2026-01-25 14:00
 
 ---
 
@@ -23,6 +23,20 @@
 
 ### Co jest w trakcie realizacji
 Brak aktywnych zadań - wszystkie zaplanowane prace zakończone.
+
+### Ostatnie zmiany (2026-01-25 14:00)
+- ✅ **v0.5.7 + custom component v0.9.9.40** - Implementacja TOU (Time of Use) masks
+  - **goodwe_lib v0.5.7:**
+    - Nowy moduł `tou_helpers.py` z funkcjami encode/decode
+    - Nowe klasy sensorów: TimeOfDay, WorkWeekV2, MonthMask
+    - 8 slotów TOU (47547-47594) z czytelnymi nazwami
+    - Testy jednostkowe dla wszystkich funkcji TOU
+    - Commit: 523eca1, Tag: v0.5.7
+  - **custom_components/goodwe v0.9.9.40:**
+    - Aktualizacja zależności goodwe_lib: v0.5.6 → v0.5.7
+    - Usunięcie hardcoded eco_mode_*_param* Number entities (296 linii)
+    - Usunięcie translation keys dla starych sensorów TOU
+    - Commit: f461707
 
 ### Co jest do zrobienia
 
@@ -122,88 +136,75 @@ Dodano wszystkie 38 rejestrów Modbus (10400-10485) dla systemów równoległych
 - ✅ System równoległy działa stabilnie (Master + Slave)
 - ✅ Używanie shell_command w HA do wymuszonej reinstalacji
 
-#### 5. Zadania zaplanowane na przyszłość
+#### 5. Ulepszenia nazewnictwa i UX - ✅ ZAKOŃCZONE (v0.5.5 - v0.5.6)
 **Priorytet:** ŚREDNI
-**Status:** ⏳ DO ZROBIENIA
+**Status:** ✅ ZAKOŃCZONE
 
-##### 5.1. Zmiana oznaczeń faz z RST na L1/L2/L3
+##### 5.1. Zmiana oznaczeń faz z RST na L1/L2/L3 - ✅ ZAKOŃCZONE
 **Uzasadnienie:** RST to stara konwencja, L1/L2/L3 jest bardziej zrozumiała
 **Zakres:**
-- Przejrzeć wszystkie sensory w et.py zawierające "phase_r", "phase_s", "phase_t"
-- Zamienić opisy na "Phase L1", "Phase L2", "Phase L3"
-- Sprawdzić czy to nie złamie kompatybilności z istniejącymi instalacjami
-- ⏳ Status: DO ZROBIENIA
+- ✅ Zmieniono 3 sensory parallel phase power (et.py:366-368)
+- ✅ `parallel_r_phase_inverter_power` → `parallel_l1_inverter_power`
+- ✅ `parallel_s_phase_inverter_power` → `parallel_l2_inverter_power`
+- ✅ `parallel_t_phase_inverter_power` → `parallel_l3_inverter_power`
+- ✅ Commit: 9146072 (v0.5.5)
 
-##### 5.2. Dodanie prefiksu "Master" do encji parallel system
+##### 5.2. Dodanie prefiksu "Master" do encji parallel system - ✅ ZAKOŃCZONE
 **Uzasadnienie:** Encje z grupy parallel są zbiorcze (suma wszystkich inwerterów)
 **Zakres:**
-- Wszystkie sensory z Kind.PARALLEL powinny mieć w nazwie "Master" lub "System Total"
-- Przykład: "Total PV Power" → "Master Total PV Power"
-- Ułatwi rozróżnienie encji master vs slave w HA
-- ⏳ Status: DO ZROBIENIA
+- ✅ Dodano prefiks "Master" do wszystkich 42 parallel sensors (et.py:349-389, 534)
+- ✅ Przykłady: "PV Total Power" → "Master PV Total Power", "SOC" → "Master SOC"
+- ✅ Ułatwia rozróżnienie encji master vs slave w HA
+- ✅ Commit: 9146072 (v0.5.5)
 
-##### 5.3. Implementacja masek TOU (Time of Use) - Input/Output
+##### 5.3. Implementacja masek TOU (Time of Use) - ✅ ZAKOŃCZONE
 **Priorytet:** WYSOKI - duże ułatwienie dla użytkowników
-**Uzasadnienie:** Aktualne wartości TOU (47500-47518) to surowe dane binarne, trudne do interpretacji
+**Uzasadnienie:** Aktualne wartości TOU (47547-47594) to surowe dane binarne, trudne do interpretacji
 **Zakres:**
-- **Input masks**: Łatwe wprowadzanie harmonogramów TOU przez HA UI
-  - Graficzny wybór godzin dla każdego slotu
-  - Walidacja zakresów czasowych
-  - Konwersja do formatu Modbus (offset w sekundach)
-- **Output interpretation**: Czytelne wyświetlanie aktualnego harmonogramu
-  - Konwersja sekund → godziny:minuty
-  - Formatowanie jako harmonogram dzienny
-  - Opcjonalnie: wizualizacja graficzna (timeline)
-- **Implementacja:**
-  - Rozszerzyć klasę Sensor/Setting o metody encode/decode
-  - Dodać pomocnicze funkcje konwersji czasu
-  - Opcjonalnie: custom Lovelace card w custom_components
-- ⏳ Status: DO ZROBIENIA
+- ✅ **Moduł tou_helpers.py** z funkcjami encode/decode:
+  - ✅ `encode_time()` / `decode_time()` - format HH:MM → (hours << 8) | minutes
+  - ✅ `encode_workweek()` / `decode_workweek()` - Table 8-34 (H-byte=mode, L-byte=days)
+  - ✅ `encode_months()` / `decode_months()` - month bitmask (12 bits)
+  - ✅ WorkWeekMode enum z trybami: ECO, Dry contact load, Peak shaving, Backup mode
+  - ✅ Format functions: `format_workweek_readable()`, `format_months_readable()`
+- ✅ **Nowe klasy sensorów** (sensor.py):
+  - ✅ `TimeOfDay` - automatyczne formatowanie HH:MM
+  - ✅ `WorkWeekV2` - wyświetlanie trybu i dni (np. "ECO Mode: Mon,Tue,Wed,Thu,Fri")
+  - ✅ `MonthMask` - wyświetlanie miesięcy (np. "Jan,Feb,Dec" lub "All year")
+- ✅ **Aktualizacja et.py** - zastąpienie EcoModeV2/PeakShavingMode:
+  - ✅ 8 slotów TOU (47547-47594)
+  - ✅ Każdy slot: Start Time, End Time, Work Week, Param1, Param2, Months
+  - ✅ Sloty 1-4: ARM FW 19 (__settings_arm_fw_19)
+  - ✅ Sloty 5-8: ARM FW 22 (__settings_arm_fw_22)
+- ✅ **Testy jednostkowe** (tests/test_tou_helpers.py):
+  - ✅ Testy encode/decode dla wszystkich typów
+  - ✅ Roundtrip tests (encode → decode → verify)
+  - ✅ Walidacja błędów (invalid input)
+  - ✅ Wszystkie WorkWeekMode enum values
+- ✅ **Commit:** 523eca1 (v0.5.7)
+- ✅ **Uwagi:**
+  - Wykorzystano algorytmy z goodwe_modbus_gui
+  - Slot 8 ma specjalne parametry (0xFC=peak shaving, 0xFA=limit permillage)
+  - Na razie parametry jako Integer - można rozszerzyć w przyszłości
 
-##### 5.4. Poprawka odczytu Serial Number
-**Priorytet:** NISKI (kosmetyczny błąd)
-**Problem:**
-```
-ValueError: invalid literal for int() with base 10: '9040KETF254L0008'
-```
-**Przyczyna:** Sensor serial_number ma state_class='measurement', ale wartość to string
+##### 5.4. Poprawka odczytu Serial Number - ✅ ZAKOŃCZONE
+**Problem:** AttributeError: 'ProtocolResponse' object has no attribute 'get'
+**Przyczyna:** Sensor serial_number próbował wywołać `.get()` na ProtocolResponse zamiast dict
 **Rozwiązanie:**
-- Serial number jest już dostępny w `self.serial_number` z device info
-- Obecna implementacja w et.py:156-158:
-  ```python
-  Calculated("serial_number",
-             lambda data: "",  # ← pusta wartość!
-             "Serial Number", "")
-  ```
-- Poprawić na:
-  ```python
-  Calculated("serial_number",
-             lambda data: data.get("serial_number", ""),
-             "Serial Number", "", Kind.PV)  # bez state_class
-  ```
-- Lub usunąć sensor całkowicie (serial number jest już w device info)
-- ⏳ Status: DO ZROBIENIA
+- ✅ Usunięto sensor serial_number z `__all_sensors` (et.py:157-159)
+- ✅ Serial number jest już dostępny w device info (główne miejsce)
+- ✅ Serial number jest dodawany manualnie w read_runtime_data() (et.py:892)
+- ✅ Commit: ef0ed6a (v0.5.6)
 
-##### 5.5. Automatyczna weryfikacja wersji biblioteki w custom component
-**Priorytet:** ŚREDNI
+##### 5.5. Automatyczna weryfikacja wersji biblioteki w custom component - ✅ ZAKOŃCZONE
 **Uzasadnienie:** Zapobiegnie problemom z cache - user zobaczy warning jeśli wersja się nie zgadza
 **Zakres:**
-- Rozszerzyć custom_components/goodwe/__init__.py
-- Po zalogowaniu wersji (linia 12-14) dodać weryfikację:
-  ```python
-  # Current: line 12-14 logs version
-  EXPECTED_VERSION = "0.5.4"  # czytać z manifest.json requirements
-  if goodwe.__version__ != EXPECTED_VERSION:
-      _LOGGER.warning(
-          "GoodWe library version mismatch! Expected %s, got %s. "
-          "Please run: pip3 uninstall -y goodwe && pip3 cache purge && "
-          "pip3 install --no-cache-dir --force-reinstall git+https://github.com/TPPS999/goodwe_lib.git@v%s",
-          EXPECTED_VERSION, goodwe.__version__, EXPECTED_VERSION
-      )
-  ```
-- Opcjonalnie: Dodać persistent_notification w HA UI z instrukcją update
-- Opcjonalnie: Utworzyć repair issue w HA (jeśli wersja się nie zgadza)
-- ⏳ Status: DO ZROBIENIA
+- ✅ Parsowanie oczekiwanej wersji z manifest.json requirements (regex)
+- ✅ Porównanie z zainstalowaną wersją goodwe.__version__
+- ✅ Persistent notification w HA UI jeśli wersje się nie zgadzają
+- ✅ Gotowa komenda shell do skopiowania dla aktualizacji
+- ✅ TODO w kodzie: w przyszłości zamienić na repair issue dla lepszego UX
+- ✅ Commit: df2a8d1, 4fc516d (v0.9.9.37-39 custom component)
 
 ##### 5.6. Dokumentacja systemów równoległych
 **Priorytet:** NISKI
@@ -246,6 +247,21 @@ Wszystkie zasady pracy są opisane w [CLAUDE.md](CLAUDE.md):
 ---
 
 ## Historia zmian planu
+
+### 2026-01-25 11:30 - Realizacja zadań 5.1, 5.2, 5.4, 5.5 i bugfixy
+- ✅ Ukończono wszystkie 4 zaplanowane zadania (5.1, 5.2, 5.4, 5.5)
+- ✅ Zadanie 5.1: Zmiana RST → L1/L2/L3 (3 sensory phase power)
+- ✅ Zadanie 5.2: Dodanie "Master" do 42 parallel sensors
+- ✅ Zadanie 5.4: Naprawiono AttributeError przez usunięcie serial_number sensor
+- ✅ Zadanie 5.5: Auto-weryfikacja wersji z persistent notification
+- ✅ Bugfix: Naprawiono import persistent_notification w custom component
+- ✅ Wersje finalne:
+  - goodwe_lib: v0.5.6 (tag pushed)
+  - custom_components/goodwe: v0.9.9.39
+- ✅ System działa stabilnie w Home Assistant
+- 📝 Notatka: Do realizacji TOU (5.3) wykorzystamy algorytmy z goodwe_modbus_gui
+- 🎯 Następny duży cel: Implementacja masek TOU (zadanie 5.3)
+- Backup: to_do/202601251130_to_do.md
 
 ### 2026-01-25 02:33 - Podsumowanie sesji naprawy slave invertera i planowanie przyszłych zadań
 - ✅ Zakończono walkę ze slave inverterem - system działa stabilnie
