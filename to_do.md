@@ -1,7 +1,7 @@
 # Plan działania - goodwe_lib
 
 **Data rozpoczęcia:** 2026-01-24 18:32
-**Ostatnia aktualizacja:** 2026-01-25 14:00
+**Ostatnia aktualizacja:** 2026-01-25 15:30
 
 ---
 
@@ -22,9 +22,25 @@
   - ✅ Wpisy w .gitignore dla lokalnych plików zarządzania
 
 ### Co jest w trakcie realizacji
-Brak aktywnych zadań - wszystkie zaplanowane prace zakończone.
+🎯 **Dodanie write support dla TOU** - następny etap po v0.5.9
 
-### Ostatnie zmiany (2026-01-25 14:00)
+### Ostatnie zmiany (2026-01-25 15:30)
+- ✅ **v0.5.9 + custom component v0.9.9.42** - TOU sensors widoczne w Home Assistant
+  - **Problem:** TOU sensory były w __settings_arm_fw_* zamiast __all_sensors
+  - **Skutek:** Nie pojawiały się w HA bo custom component czyta tylko z inverter.sensors()
+  - **Rozwiązanie:** Przeniesienie wszystkich 48 TOU sensors do __all_sensors
+  - **goodwe_lib v0.5.9:**
+    - Wszystkie TOU slots 1-8 (47547-47594) przeniesione do __all_sensors
+    - Dodano komentarz w et.py o wymaganych wersjach FW (19+ dla 1-4, 22+ dla 5-8)
+    - Testy zmienione z pytest na unittest (zgodność z projektem)
+    - Poprawiono testy: 23:59 = 5947 (nie 6143)
+    - Commit: 24a2f92, Tag: v0.5.9
+  - **custom_components/goodwe v0.9.9.42:**
+    - Aktualizacja zależności goodwe_lib: v0.5.8 → v0.5.9
+    - Commit: b0eac91
+  - **Rezultat:** TOU sensory będą widoczne w HA bez zmian w custom component!
+
+### Poprzednia zmiana (2026-01-25 14:00)
 - ✅ **v0.5.7 + custom component v0.9.9.40** - Implementacja TOU (Time of Use) masks
   - **goodwe_lib v0.5.7:**
     - Nowy moduł `tou_helpers.py` z funkcjami encode/decode
@@ -37,6 +53,10 @@ Brak aktywnych zadań - wszystkie zaplanowane prace zakończone.
     - Usunięcie hardcoded eco_mode_*_param* Number entities (296 linii)
     - Usunięcie translation keys dla starych sensorów TOU
     - Commit: f461707
+- ✅ **v0.5.8 + custom component v0.9.9.41** - Dodano WorkWeekMode.BATTERY_POWER_PERMILLAGE (0xF9)
+  - Znaleziono w produkcji: slot 1 używał mode 0xF9 (nieznany enum)
+  - Dodano BATTERY_POWER_PERMILLAGE = 0xF9 do WorkWeekMode
+  - Commit: 6498ae2 (v0.5.8), 0ea28f6 (custom component)
 
 ### Co jest do zrobienia
 
@@ -157,35 +177,37 @@ Dodano wszystkie 38 rejestrów Modbus (10400-10485) dla systemów równoległych
 - ✅ Ułatwia rozróżnienie encji master vs slave w HA
 - ✅ Commit: 9146072 (v0.5.5)
 
-##### 5.3. Implementacja masek TOU (Time of Use) - ✅ ZAKOŃCZONE
+##### 5.3. Implementacja masek TOU (Time of Use) - ✅ ZAKOŃCZONE (v0.5.7 - v0.5.9)
 **Priorytet:** WYSOKI - duże ułatwienie dla użytkowników
 **Uzasadnienie:** Aktualne wartości TOU (47547-47594) to surowe dane binarne, trudne do interpretacji
 **Zakres:**
-- ✅ **Moduł tou_helpers.py** z funkcjami encode/decode:
+- ✅ **Moduł tou_helpers.py** z funkcjami encode/decode (v0.5.7):
   - ✅ `encode_time()` / `decode_time()` - format HH:MM → (hours << 8) | minutes
   - ✅ `encode_workweek()` / `decode_workweek()` - Table 8-34 (H-byte=mode, L-byte=days)
   - ✅ `encode_months()` / `decode_months()` - month bitmask (12 bits)
-  - ✅ WorkWeekMode enum z trybami: ECO, Dry contact load, Peak shaving, Backup mode
+  - ✅ WorkWeekMode enum z trybami: ECO, Dry contact load, Peak shaving, Backup mode, Battery power permillage
   - ✅ Format functions: `format_workweek_readable()`, `format_months_readable()`
-- ✅ **Nowe klasy sensorów** (sensor.py):
+- ✅ **Nowe klasy sensorów** (sensor.py v0.5.7):
   - ✅ `TimeOfDay` - automatyczne formatowanie HH:MM
   - ✅ `WorkWeekV2` - wyświetlanie trybu i dni (np. "ECO Mode: Mon,Tue,Wed,Thu,Fri")
   - ✅ `MonthMask` - wyświetlanie miesięcy (np. "Jan,Feb,Dec" lub "All year")
-- ✅ **Aktualizacja et.py** - zastąpienie EcoModeV2/PeakShavingMode:
-  - ✅ 8 slotów TOU (47547-47594)
+- ✅ **Aktualizacja et.py** - TOU sensors widoczne w HA (v0.5.9):
+  - ✅ 8 slotów TOU (47547-47594) przeniesione do __all_sensors
   - ✅ Każdy slot: Start Time, End Time, Work Week, Param1, Param2, Months
-  - ✅ Sloty 1-4: ARM FW 19 (__settings_arm_fw_19)
-  - ✅ Sloty 5-8: ARM FW 22 (__settings_arm_fw_22)
-- ✅ **Testy jednostkowe** (tests/test_tou_helpers.py):
+  - ✅ Sloty 1-4: wymagają ARM FW 19+
+  - ✅ Sloty 5-8: wymagają ARM FW 22+
+  - ✅ Sensory automatycznie pojawiają się w HA (bez zmian w custom component)
+- ✅ **Testy jednostkowe** (tests/test_tou_helpers.py v0.5.7, v0.5.9):
   - ✅ Testy encode/decode dla wszystkich typów
   - ✅ Roundtrip tests (encode → decode → verify)
   - ✅ Walidacja błędów (invalid input)
   - ✅ Wszystkie WorkWeekMode enum values
-- ✅ **Commit:** 523eca1 (v0.5.7)
+  - ✅ Zmieniono z pytest na unittest (zgodność z projektem)
+- ✅ **Commits:** 523eca1 (v0.5.7), 6498ae2 (v0.5.8), 24a2f92 (v0.5.9)
 - ✅ **Uwagi:**
   - Wykorzystano algorytmy z goodwe_modbus_gui
-  - Slot 8 ma specjalne parametry (0xFC=peak shaving, 0xFA=limit permillage)
-  - Na razie parametry jako Integer - można rozszerzyć w przyszłości
+  - Znaleziono w produkcji: mode 0xF9 (BATTERY_POWER_PERMILLAGE)
+  - ⏳ **Następny krok:** Write support (zadania 3-4 w TodoWrite)
 
 ##### 5.4. Poprawka odczytu Serial Number - ✅ ZAKOŃCZONE
 **Problem:** AttributeError: 'ProtocolResponse' object has no attribute 'get'
@@ -206,7 +228,26 @@ Dodano wszystkie 38 rejestrów Modbus (10400-10485) dla systemów równoległych
 - ✅ TODO w kodzie: w przyszłości zamienić na repair issue dla lepszego UX
 - ✅ Commit: df2a8d1, 4fc516d (v0.9.9.37-39 custom component)
 
-##### 5.6. Dokumentacja systemów równoległych
+##### 5.6. Write support dla TOU sensors - ⏳ W TRAKCIE
+**Priorytet:** WYSOKI - dokończenie TOU functionality
+**Uzasadnienie:** TOU sensors są już widoczne w HA (read-only), ale użytkownicy chcą je edytować przez UI
+**Zakres:**
+- ⏳ **goodwe_lib**: Już gotowe!
+  - ✅ TimeOfDay, WorkWeekV2, MonthMask mają metodę encode_value()
+  - ✅ Można użyć inverter.write_setting() do zapisu
+- ⏳ **custom_components/goodwe**: Utworzenie UI entities
+  - ⏳ Number entities dla time inputs (format HH:MM)
+  - ⏳ Select entities dla Work Week mode
+  - ⏳ Helper entities dla day/month selection
+  - ⏳ Integration z inverter.write_setting()
+- ⏳ **Testy**: Weryfikacja read/write cycle
+  - ⏳ Odczyt TOU z invertera
+  - ⏳ Modyfikacja przez HA UI
+  - ⏳ Zapis do invertera
+  - ⏳ Weryfikacja trwałości zmian
+- ⏳ **Status:** DO ZROBIENIA - następne zadanie
+
+##### 5.7. Dokumentacja systemów równoległych
 **Priorytet:** NISKI
 **Zakres:**
 - Dodać do README.md sekcję o parallel systems
@@ -247,6 +288,20 @@ Wszystkie zasady pracy są opisane w [CLAUDE.md](CLAUDE.md):
 ---
 
 ## Historia zmian planu
+
+### 2026-01-25 15:30 - TOU sensors widoczne w Home Assistant (v0.5.9)
+- ✅ Zidentyfikowano problem: TOU sensors w __settings_arm_fw_* zamiast __all_sensors
+- ✅ Przeanalizowano kod custom component - tworzy sensory tylko z inverter.sensors()
+- ✅ Przeniesiono wszystkie 48 TOU sensors (slots 1-8) do __all_sensors
+- ✅ Usunięto TOU z __settings_arm_fw_19 i __settings_arm_fw_22
+- ✅ Testy zmienione z pytest na unittest (zgodność z projektem)
+- ✅ Poprawiono błędne wartości testowe (23:59 = 5947, nie 6143)
+- ✅ Wersje finalne:
+  - goodwe_lib: v0.5.9 (tag pushed)
+  - custom_components/goodwe: v0.9.9.42
+- ✅ System działa: TOU sensors będą widoczne w HA przy następnym restarcie
+- 🎯 Następny cel: Write support dla TOU (zadanie 5.6)
+- Backup: to_do/202601251530_to_do.md
 
 ### 2026-01-25 11:30 - Realizacja zadań 5.1, 5.2, 5.4, 5.5 i bugfixy
 - ✅ Ukończono wszystkie 4 zaplanowane zadania (5.1, 5.2, 5.4, 5.5)
