@@ -26,6 +26,7 @@ class WorkWeekMode(IntEnum):
     PEAK_SHAVING_DISABLE = 0x03
     BACKUP_MODE_ENABLE = 0xFB
     BACKUP_MODE_DISABLE = 0x04
+    BATTERY_POWER_PERMILLAGE = 0xF9  # Battery power permillage mode (observed in practice)
 
 
 # Day names mapping (0=Sunday, 1=Monday, ..., 6=Saturday)
@@ -50,6 +51,7 @@ MODE_NAMES = {
     WorkWeekMode.PEAK_SHAVING_DISABLE: "Peak Shaving Disabled",
     WorkWeekMode.BACKUP_MODE_ENABLE: "Backup Mode",
     WorkWeekMode.BACKUP_MODE_DISABLE: "Backup Mode Disabled",
+    WorkWeekMode.BATTERY_POWER_PERMILLAGE: "Battery Power Permillage",
 }
 
 
