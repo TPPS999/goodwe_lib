@@ -153,10 +153,8 @@ class ET(Inverter):
                    read_bytes2_signed(data, 35140),
                    "House Consumption", "W", Kind.AC),
 
-        # Inverter identification - added manually in read_runtime_data()
-        Calculated("serial_number",
-                   lambda data: data.get("serial_number", ""),
-                   "Serial Number", "", Kind.PV),
+        # Serial Number is added manually in read_runtime_data() at line 892
+        # It's already available in device info, no need to expose as sensor
 
         # Power4S("pbattery2", 35264, "Battery2 Power", Kind.BAT),
         # Integer("battery2_mode", 35266, "Battery2 Mode code", "", Kind.BAT),
