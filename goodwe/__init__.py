@@ -3,15 +3,21 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 
-# Read version from VERSION file in package root
+# Read version from installed package metadata
 try:
-    _version_file = os.path.join(os.path.dirname(__file__), '..', 'VERSION')
-    with open(_version_file, 'r', encoding='utf-8') as f:
-        __version__ = f.read().strip()
-except Exception:
-    __version__ = 'unknown'
+    from importlib.metadata import version, PackageNotFoundError
+    try:
+        __version__ = version('goodwe')
+    except PackageNotFoundError:
+        __version__ = 'unknown'
+except ImportError:
+    # Python < 3.8 fallback
+    try:
+        import pkg_resources
+        __version__ = pkg_resources.get_distribution('goodwe').version
+    except Exception:
+        __version__ = 'unknown'
 
 from .const import GOODWE_TCP_PORT, GOODWE_UDP_PORT
 from .dt import DT
