@@ -131,12 +131,14 @@ dmypy.json
 # PyCharm
 .idea
 
-CLAUDE.md 
-
+# Project management files (local only)
+CLAUDE.md
+to_do.md
 
 # Documentation files (local only)
 *.docx
 
+# Folders with local data
 /docs
 /to_do
 /context_record 

@@ -1,7 +1,7 @@
 # Plan działania - goodwe_lib
 
 **Data rozpoczęcia:** 2026-01-24 18:32
-**Ostatnia aktualizacja:** 2026-01-24 20:00
+**Ostatnia aktualizacja:** 2026-01-25 02:33
 
 ---
 
@@ -87,10 +87,141 @@ Dodano wszystkie 38 rejestrów Modbus (10400-10485) dla systemów równoległych
 - ✅ Commit i push zmian do obu repozytoriów
 - ⏳ Testy z Home Assistant (do wykonania przez użytkownika)
 
-#### 4. Dalszy rozwój - backlog
+#### 4. Naprawy i ulepszenia po implementacji Parallel System - ✅ ZAKOŃCZONE (v0.5.4)
+**Priorytet:** KRYTYCZNY
+**Status:** ✅ ZAKOŃCZONE
+
+##### 4.1. Problem: Slave inverter zwracał success: False - ✅ ROZWIĄZANE
+- ✅ Zidentyfikowano problem: brak zagnieżdżonych try/except w meter fallback chain
+- ✅ Dodano nested exception handling dla całego fallback:
+  - Extended meter2 (125 reg) → Extended (58 reg) → Basic (45 reg)
+  - Każdy poziom z własnym try/except dla ILLEGAL_DATA_ADDRESS
+- ✅ Rezultat: Slave zwraca `success: True`
+- ✅ Commit: 00504d0 (v0.5.2)
+
+##### 4.2. Problem: Version detection pokazywał 'unknown' - ✅ ROZWIĄZANE
+- ✅ Dodano `__version__` attribute w goodwe/__init__.py
+- ✅ Użyto importlib.metadata (standard Python packaging)
+- ✅ Dodano MANIFEST.in dla pliku VERSION
+- ✅ Fallback do pkg_resources dla starszych Python
+- ✅ Rezultat: Pokazuje `GoodWe library version: 0.5.4`
+- ✅ Commit: 36b80d8 (v0.5.3), 3af2f8e (v0.5.4)
+
+##### 4.3. Comprehensive EMS Settings - ✅ DODANE
+- ✅ 24 sloty Feed Power schedule (47619-47738)
+- ✅ Force charge SOC settings (47531-47532)
+- ✅ WiFi management (47539, 47541)
+- ✅ SAPN settings (47739-47744)
+- ✅ Battery/Grid control registers
+- ✅ Commit: cf887a6 (v0.5.1)
+
+##### 4.4. Finalizacja - ✅ ZAKOŃCZONE
+- ✅ goodwe_lib: v0.5.0 → v0.5.4
+- ✅ custom_components/goodwe: 0.9.9.31 → 0.9.9.36
+- ✅ Wszystkie tagi pushed do GitHub
+- ✅ System równoległy działa stabilnie (Master + Slave)
+- ✅ Używanie shell_command w HA do wymuszonej reinstalacji
+
+#### 5. Zadania zaplanowane na przyszłość
+**Priorytet:** ŚREDNI
+**Status:** ⏳ DO ZROBIENIA
+
+##### 5.1. Zmiana oznaczeń faz z RST na L1/L2/L3
+**Uzasadnienie:** RST to stara konwencja, L1/L2/L3 jest bardziej zrozumiała
+**Zakres:**
+- Przejrzeć wszystkie sensory w et.py zawierające "phase_r", "phase_s", "phase_t"
+- Zamienić opisy na "Phase L1", "Phase L2", "Phase L3"
+- Sprawdzić czy to nie złamie kompatybilności z istniejącymi instalacjami
+- ⏳ Status: DO ZROBIENIA
+
+##### 5.2. Dodanie prefiksu "Master" do encji parallel system
+**Uzasadnienie:** Encje z grupy parallel są zbiorcze (suma wszystkich inwerterów)
+**Zakres:**
+- Wszystkie sensory z Kind.PARALLEL powinny mieć w nazwie "Master" lub "System Total"
+- Przykład: "Total PV Power" → "Master Total PV Power"
+- Ułatwi rozróżnienie encji master vs slave w HA
+- ⏳ Status: DO ZROBIENIA
+
+##### 5.3. Implementacja masek TOU (Time of Use) - Input/Output
+**Priorytet:** WYSOKI - duże ułatwienie dla użytkowników
+**Uzasadnienie:** Aktualne wartości TOU (47500-47518) to surowe dane binarne, trudne do interpretacji
+**Zakres:**
+- **Input masks**: Łatwe wprowadzanie harmonogramów TOU przez HA UI
+  - Graficzny wybór godzin dla każdego slotu
+  - Walidacja zakresów czasowych
+  - Konwersja do formatu Modbus (offset w sekundach)
+- **Output interpretation**: Czytelne wyświetlanie aktualnego harmonogramu
+  - Konwersja sekund → godziny:minuty
+  - Formatowanie jako harmonogram dzienny
+  - Opcjonalnie: wizualizacja graficzna (timeline)
+- **Implementacja:**
+  - Rozszerzyć klasę Sensor/Setting o metody encode/decode
+  - Dodać pomocnicze funkcje konwersji czasu
+  - Opcjonalnie: custom Lovelace card w custom_components
+- ⏳ Status: DO ZROBIENIA
+
+##### 5.4. Poprawka odczytu Serial Number
+**Priorytet:** NISKI (kosmetyczny błąd)
+**Problem:**
+```
+ValueError: invalid literal for int() with base 10: '9040KETF254L0008'
+```
+**Przyczyna:** Sensor serial_number ma state_class='measurement', ale wartość to string
+**Rozwiązanie:**
+- Serial number jest już dostępny w `self.serial_number` z device info
+- Obecna implementacja w et.py:156-158:
+  ```python
+  Calculated("serial_number",
+             lambda data: "",  # ← pusta wartość!
+             "Serial Number", "")
+  ```
+- Poprawić na:
+  ```python
+  Calculated("serial_number",
+             lambda data: data.get("serial_number", ""),
+             "Serial Number", "", Kind.PV)  # bez state_class
+  ```
+- Lub usunąć sensor całkowicie (serial number jest już w device info)
+- ⏳ Status: DO ZROBIENIA
+
+##### 5.5. Automatyczna weryfikacja wersji biblioteki w custom component
+**Priorytet:** ŚREDNI
+**Uzasadnienie:** Zapobiegnie problemom z cache - user zobaczy warning jeśli wersja się nie zgadza
+**Zakres:**
+- Rozszerzyć custom_components/goodwe/__init__.py
+- Po zalogowaniu wersji (linia 12-14) dodać weryfikację:
+  ```python
+  # Current: line 12-14 logs version
+  EXPECTED_VERSION = "0.5.4"  # czytać z manifest.json requirements
+  if goodwe.__version__ != EXPECTED_VERSION:
+      _LOGGER.warning(
+          "GoodWe library version mismatch! Expected %s, got %s. "
+          "Please run: pip3 uninstall -y goodwe && pip3 cache purge && "
+          "pip3 install --no-cache-dir --force-reinstall git+https://github.com/TPPS999/goodwe_lib.git@v%s",
+          EXPECTED_VERSION, goodwe.__version__, EXPECTED_VERSION
+      )
+  ```
+- Opcjonalnie: Dodać persistent_notification w HA UI z instrukcją update
+- Opcjonalnie: Utworzyć repair issue w HA (jeśli wersja się nie zgadza)
+- ⏳ Status: DO ZROBIENIA
+
+##### 5.6. Dokumentacja systemów równoległych
+**Priorytet:** NISKI
+**Zakres:**
+- Dodać do README.md sekcję o parallel systems
+- Wyjaśnić różnice Master vs Slave
+- Opisać które rejestry są dostępne dla slave
+- Dodać przykłady konfiguracji w HA
+- ⏳ Status: DO ZROBIENIA
+
+#### 6. Znane ograniczenia (do zaakceptowania)
+- ❌ **Slave nie ma SOC baterii**: W systemach równoległych GoodWe tylko master ma dostęp do BMS (37000-37023). Slave zwraca ILLEGAL_DATA_ADDRESS. To jest **ograniczenie hardware**, nie bug.
+- ❌ **Slave nie ma meter**: Meter jest wspólny i obsługiwany przez master. Slave zwraca ILLEGAL_DATA_ADDRESS dla 36000+.
+
+#### 7. Dalszy rozwój - backlog
 - Wsparcie dla nowych modeli inwerterów (jeśli będą zgłoszenia)
-- Rozszerzenie dokumentacji
 - Optymalizacja istniejącego kodu
+- Rozszerzenie testów jednostkowych
 
 ---
 
@@ -115,6 +246,26 @@ Wszystkie zasady pracy są opisane w [CLAUDE.md](CLAUDE.md):
 ---
 
 ## Historia zmian planu
+
+### 2026-01-25 02:33 - Podsumowanie sesji naprawy slave invertera i planowanie przyszłych zadań
+- ✅ Zakończono walkę ze slave inverterem - system działa stabilnie
+- ✅ Dodano sekcję 4: Naprawy po implementacji Parallel System (v0.5.2 - v0.5.4)
+  - 4.1: Nested exception handling dla meter fallback
+  - 4.2: Version detection przez importlib.metadata
+  - 4.3: Comprehensive EMS settings
+  - 4.4: Finalizacja - v0.5.4
+- ✅ Dodano sekcję 5: Zadania zaplanowane na przyszłość
+  - 5.1: Zmiana RST → L1/L2/L3 w opisach faz
+  - 5.2: Dodanie "Master" do encji parallel
+  - 5.3: Maski TOU input/output (duże zadanie!)
+  - 5.4: Poprawka Serial Number sensor
+  - 5.5: Automatyczna weryfikacja wersji w custom component (inteligentne!)
+  - 5.6: Dokumentacja parallel systems
+- ✅ Dodano sekcję 6: Znane ograniczenia (slave bez SOC/meter - hardware limitation)
+- 📝 System równoległy działa: Master (success: True) + Slave (success: True)
+- 📝 Wersje finalne: goodwe_lib v0.5.4, custom_components v0.9.9.36
+- 🎉 Kluczowa lekcja: pip cache + shell_command = winning combination
+- Backup: to_do/202601250233_to_do.md
 
 ### 2026-01-24 20:00 - Finalizacja projektu Parallel Inverter System
 - ✅ Zaktualizowano custom component (home-assistant-goodwe-inverter)
