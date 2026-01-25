@@ -820,6 +820,85 @@ class Calculated(Sensor):
         return self._getter(data)
 
 
+class TimeOfDay(Sensor):
+    """Sensor representing time in HH:MM format encoded in 2 bytes.
+
+    Encoding: (hours << 8) | minutes
+    Example: 14:30 = 0x0E1E = 3614
+    """
+
+    def __init__(self, id_: str, offset: int, name: str, kind: Optional[SensorKind] = None):
+        super().__init__(id_, offset, name, 2, "", kind)
+
+    def read_value(self, data: ProtocolResponse) -> str:
+        """Read and decode time value to HH:MM string."""
+        from .tou_helpers import decode_time
+        raw_value = read_bytes2(data)
+        return decode_time(raw_value)
+
+    def encode_value(self, value: Any, register_value: bytes = None) -> bytes:
+        """Encode HH:MM string to 2 bytes."""
+        from .tou_helpers import encode_time
+        if isinstance(value, str):
+            encoded = encode_time(value)
+            return encoded.to_bytes(2, byteorder='big', signed=False)
+        raise ValueError(f"TimeOfDay requires string value in HH:MM format, got {type(value)}")
+
+
+class WorkWeekV2(Sensor):
+    """Sensor representing Work Week with mode and days (Table 8-34).
+
+    H-byte: Mode (0x55=Not set, 0xFF=ECO, 0xFE=Dry contact load, 0xFD=Dry contact smart load,
+                  0xFC=Peak shaving, 0xFB=Backup mode)
+    L-byte: Day bitmask (bit0=Sunday, bit1=Monday, ..., bit6=Saturday)
+    """
+
+    def __init__(self, id_: str, offset: int, name: str, kind: Optional[SensorKind] = None):
+        super().__init__(id_, offset, name, 2, "", kind)
+
+    def read_value(self, data: ProtocolResponse) -> str:
+        """Read and decode work week value to human-readable string."""
+        from .tou_helpers import format_workweek_readable
+        raw_value = read_bytes2(data)
+        return format_workweek_readable(raw_value)
+
+    def encode_value(self, value: Any, register_value: bytes = None) -> bytes:
+        """Encode work week mode and days to 2 bytes."""
+        from .tou_helpers import encode_workweek, WorkWeekMode
+        if isinstance(value, tuple) and len(value) == 2:
+            mode, days = value
+            if isinstance(mode, int):
+                mode = WorkWeekMode(mode)
+            encoded = encode_workweek(mode, days)
+            return encoded.to_bytes(2, byteorder='big', signed=False)
+        raise ValueError(f"WorkWeekV2 requires tuple (mode, days), got {type(value)}")
+
+
+class MonthMask(Sensor):
+    """Sensor representing month bitmask.
+
+    Direct 12-bit bitmask (bit0=January, bit1=February, ..., bit11=December)
+    Value 0 or 0x0FFF means all year.
+    """
+
+    def __init__(self, id_: str, offset: int, name: str, kind: Optional[SensorKind] = None):
+        super().__init__(id_, offset, name, 2, "", kind)
+
+    def read_value(self, data: ProtocolResponse) -> str:
+        """Read and decode month mask to human-readable string."""
+        from .tou_helpers import format_months_readable
+        raw_value = read_bytes2(data)
+        return format_months_readable(raw_value)
+
+    def encode_value(self, value: Any, register_value: bytes = None) -> bytes:
+        """Encode list of month names to 2 bytes."""
+        from .tou_helpers import encode_months
+        if isinstance(value, list):
+            encoded = encode_months(value)
+            return encoded.to_bytes(2, byteorder='big', signed=False)
+        raise ValueError(f"MonthMask requires list of month names, got {type(value)}")
+
+
 def read_byte(buffer: ProtocolResponse, offset: int = None) -> int:
     """Retrieve single byte (signed int) value from buffer"""
     if offset is not None:
