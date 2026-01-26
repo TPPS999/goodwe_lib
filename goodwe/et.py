@@ -729,6 +729,7 @@ class ET(Inverter):
         self._has_meter_extended2: bool = False
         self._has_mppt: bool = False
         self._has_parallel: bool = False
+        self._has_ems: bool = True
         self._sensors = self.__all_sensors
         self._sensors_battery = self.__all_sensors_battery
         self._sensors_battery2 = self.__all_sensors_battery2
@@ -752,6 +753,11 @@ class ET(Inverter):
     def _not_extended_meter2(s: Sensor) -> bool:
         """Filter to exclude extended meter sensors"""
         return s.offset < 36058
+
+    @staticmethod
+    def _not_ems(s: Sensor) -> bool:
+        """Filter to exclude EMS sensors (registers 47500-47800)"""
+        return not (47500 <= s.offset <= 47800)
 
     async def read_device_info(self):
         response = await self._read_from_socket(self._READ_DEVICE_VERSION_INFO)
@@ -966,7 +972,17 @@ class ET(Inverter):
     async def read_setting(self, setting_id: str) -> Any:
         setting: Sensor = self._settings.get(setting_id)
         if setting:
-            return await self._read_sensor(setting)
+            # Check if this is an EMS register and EMS is disabled
+            if not self._has_ems and 47500 <= setting.offset <= 47800:
+                raise RequestRejectedException(ILLEGAL_DATA_ADDRESS)
+            try:
+                return await self._read_sensor(setting)
+            except RequestRejectedException as ex:
+                # EMS registers (47500-47800) are master-only in parallel systems
+                if ex.message == ILLEGAL_DATA_ADDRESS and 47500 <= setting.offset <= 47800:
+                    logger.info("EMS values not supported (slave inverter?), disabling further attempts.")
+                    self._has_ems = False
+                raise ex
         if setting_id.startswith("modbus"):
             response = await self._read_from_socket(self._read_command(int(setting_id[7:]), 1))
             return int.from_bytes(response.read(2), byteorder="big", signed=True)
@@ -1115,7 +1131,11 @@ class ET(Inverter):
         return self._sensors_map.get(sensor_id)
 
     def sensors(self) -> tuple[Sensor, ...]:
-        result = self._sensors + self._sensors_meter
+        result = self._sensors
+        # Filter EMS sensors if not supported (slave inverters in parallel systems)
+        if not self._has_ems:
+            result = tuple(filter(self._not_ems, result))
+        result = result + self._sensors_meter
         if self._has_battery:
             result = result + self._sensors_battery
         if self._has_battery2:
@@ -1127,7 +1147,11 @@ class ET(Inverter):
         return result
 
     def settings(self) -> tuple[Sensor, ...]:
-        return tuple(self._settings.values())
+        result = tuple(self._settings.values())
+        # Filter EMS settings if not supported (slave inverters in parallel systems)
+        if not self._has_ems:
+            result = tuple(filter(self._not_ems, result))
+        return result
 
     async def _clear_battery_mode_param(self) -> None:
         await self._read_from_socket(self._write_command(0xb9ad, 1))
