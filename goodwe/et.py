@@ -544,10 +544,35 @@ class ET(Inverter):
     )
 
     # Settings added in ARM firmware 19
-    # Note: TOU sensors moved to __all_sensors for visibility in HA
+    # Note: TOU sensors are ALSO in __all_sensors for visibility in HA (intentional duplication)
     __settings_arm_fw_19: tuple[Sensor, ...] = (
         Integer("fast_charging", 47545, "Fast Charging Enabled", "", Kind.BAT),
         Integer("fast_charging_soc", 47546, "Fast Charging SoC", "%", Kind.BAT),
+        # TOU Slots 1-4 (also in __all_sensors for sensor visibility)
+        TimeOfDay("tou_slot1_start_time", 47547, "TOU Slot 1 Start Time", Kind.BAT),
+        TimeOfDay("tou_slot1_end_time", 47548, "TOU Slot 1 End Time", Kind.BAT),
+        WorkWeekV2("tou_slot1_work_week", 47549, "TOU Slot 1 Work Week", Kind.BAT),
+        Integer("tou_slot1_param1", 47550, "TOU Slot 1 Parameter 1", "", Kind.BAT),
+        Integer("tou_slot1_param2", 47551, "TOU Slot 1 Parameter 2", "", Kind.BAT),
+        MonthMask("tou_slot1_months", 47552, "TOU Slot 1 Months", Kind.BAT),
+        TimeOfDay("tou_slot2_start_time", 47553, "TOU Slot 2 Start Time", Kind.BAT),
+        TimeOfDay("tou_slot2_end_time", 47554, "TOU Slot 2 End Time", Kind.BAT),
+        WorkWeekV2("tou_slot2_work_week", 47555, "TOU Slot 2 Work Week", Kind.BAT),
+        Integer("tou_slot2_param1", 47556, "TOU Slot 2 Parameter 1", "", Kind.BAT),
+        Integer("tou_slot2_param2", 47557, "TOU Slot 2 Parameter 2", "", Kind.BAT),
+        MonthMask("tou_slot2_months", 47558, "TOU Slot 2 Months", Kind.BAT),
+        TimeOfDay("tou_slot3_start_time", 47559, "TOU Slot 3 Start Time", Kind.BAT),
+        TimeOfDay("tou_slot3_end_time", 47560, "TOU Slot 3 End Time", Kind.BAT),
+        WorkWeekV2("tou_slot3_work_week", 47561, "TOU Slot 3 Work Week", Kind.BAT),
+        Integer("tou_slot3_param1", 47562, "TOU Slot 3 Parameter 1", "", Kind.BAT),
+        Integer("tou_slot3_param2", 47563, "TOU Slot 3 Parameter 2", "", Kind.BAT),
+        MonthMask("tou_slot3_months", 47564, "TOU Slot 3 Months", Kind.BAT),
+        TimeOfDay("tou_slot4_start_time", 47565, "TOU Slot 4 Start Time", Kind.BAT),
+        TimeOfDay("tou_slot4_end_time", 47566, "TOU Slot 4 End Time", Kind.BAT),
+        WorkWeekV2("tou_slot4_work_week", 47567, "TOU Slot 4 Work Week", Kind.BAT),
+        Integer("tou_slot4_param1", 47568, "TOU Slot 4 Parameter 1", "", Kind.BAT),
+        Integer("tou_slot4_param2", 47569, "TOU Slot 4 Parameter 2", "", Kind.BAT),
+        MonthMask("tou_slot4_months", 47570, "TOU Slot 4 Months", Kind.BAT),
         Integer("load_control_mode", 47595, "Load Control Mode", "", Kind.AC),
         Integer("load_control_switch", 47596, "Load Control Switch", "", Kind.AC),
         Integer("load_control_soc", 47597, "Load Control SoC", "", Kind.AC),
@@ -648,10 +673,35 @@ class ET(Inverter):
     )
 
     # Settings added in ARM firmware 22
-    # Note: TOU sensors moved to __all_sensors for visibility in HA
+    # Note: TOU sensors are ALSO in __all_sensors for visibility in HA (intentional duplication)
     __settings_arm_fw_22: tuple[Sensor, ...] = (
         Long("peak_shaving_power_limit", 47542, "Peak Shaving Power Limit"),
         Integer("peak_shaving_soc", 47544, "Peak Shaving SoC"),
+        # TOU Slots 5-8 (also in __all_sensors for sensor visibility)
+        TimeOfDay("tou_slot5_start_time", 47571, "TOU Slot 5 Start Time", Kind.BAT),
+        TimeOfDay("tou_slot5_end_time", 47572, "TOU Slot 5 End Time", Kind.BAT),
+        WorkWeekV2("tou_slot5_work_week", 47573, "TOU Slot 5 Work Week", Kind.BAT),
+        Integer("tou_slot5_param1", 47574, "TOU Slot 5 Parameter 1", "", Kind.BAT),
+        Integer("tou_slot5_param2", 47575, "TOU Slot 5 Parameter 2", "", Kind.BAT),
+        MonthMask("tou_slot5_months", 47576, "TOU Slot 5 Months", Kind.BAT),
+        TimeOfDay("tou_slot6_start_time", 47577, "TOU Slot 6 Start Time", Kind.BAT),
+        TimeOfDay("tou_slot6_end_time", 47578, "TOU Slot 6 End Time", Kind.BAT),
+        WorkWeekV2("tou_slot6_work_week", 47579, "TOU Slot 6 Work Week", Kind.BAT),
+        Integer("tou_slot6_param1", 47580, "TOU Slot 6 Parameter 1", "", Kind.BAT),
+        Integer("tou_slot6_param2", 47581, "TOU Slot 6 Parameter 2", "", Kind.BAT),
+        MonthMask("tou_slot6_months", 47582, "TOU Slot 6 Months", Kind.BAT),
+        TimeOfDay("tou_slot7_start_time", 47583, "TOU Slot 7 Start Time", Kind.BAT),
+        TimeOfDay("tou_slot7_end_time", 47584, "TOU Slot 7 End Time", Kind.BAT),
+        WorkWeekV2("tou_slot7_work_week", 47585, "TOU Slot 7 Work Week", Kind.BAT),
+        Integer("tou_slot7_param1", 47586, "TOU Slot 7 Parameter 1", "", Kind.BAT),
+        Integer("tou_slot7_param2", 47587, "TOU Slot 7 Parameter 2", "", Kind.BAT),
+        MonthMask("tou_slot7_months", 47588, "TOU Slot 7 Months", Kind.BAT),
+        TimeOfDay("tou_slot8_start_time", 47589, "TOU Slot 8 Start Time", Kind.BAT),
+        TimeOfDay("tou_slot8_end_time", 47590, "TOU Slot 8 End Time", Kind.BAT),
+        WorkWeekV2("tou_slot8_work_week", 47591, "TOU Slot 8 Work Week", Kind.BAT),
+        Integer("tou_slot8_param1", 47592, "TOU Slot 8 Parameter 1", "", Kind.BAT),
+        Integer("tou_slot8_param2", 47593, "TOU Slot 8 Parameter 2", "", Kind.BAT),
+        MonthMask("tou_slot8_months", 47594, "TOU Slot 8 Months", Kind.BAT),
         Integer("dod_holding", 47602, "DoD Holding", "", Kind.BAT),
         Integer("backup_mode_enable", 47605, "Backup Mode Switch"),
         Integer("max_charge_power", 47606, "Max Charge Power"),
