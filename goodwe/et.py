@@ -803,10 +803,11 @@ class ET(Inverter):
         self.arm_firmware = self._decode(response[54:66])  # 35027 - 35032
 
         # Filter PV sensors based on MPPT count
-        # Each MPPT has 2 PV inputs: MPPT1->PV1+PV2, MPPT2->PV3+PV4, MPPT3->PV5+PV6, MPPT4->PV7+PV8
+        # Standard mapping: MPPT1->PV1+PV2, MPPT2->PV3+PV4, MPPT3->PV5+PV6, MPPT4->PV7+PV8
+        # Note: Main sensors (35103-35119) only have PV1-4, extended PV5-16 are in _sensors_mppt
         if is_3_mppt(self):
-            # 3 MPPT inverters (e.g. ET40): PV1-6, filter out PV4 from main sensors and PV7-16 from MPPT sensors
-            self._sensors = tuple(filter(lambda s: 'pv4' not in s.id_, self._sensors))
+            # 3 MPPT inverters: PV1-4 (main sensors) + PV5-16 (MPPT sensors, filtered below to PV5-6)
+            # Keep PV1-4 in main sensors, filter MPPT sensors to PV5-6 only (not PV7-16)
             self._sensors_mppt = tuple(filter(lambda s: not any(f'pv{i}' in s.id_ for i in range(7, 17)), self._sensors_mppt))
         elif is_4_mppt(self):
             # 4 MPPT inverters (e.g. ET50): PV1-8, filter out PV9-16 from MPPT sensors

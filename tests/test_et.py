@@ -819,7 +819,7 @@ class GW25K_ET_Test(EtMock):
         self.loop.run_until_complete(self.read_device_info())
 
         data = self.loop.run_until_complete(self.read_runtime_data())
-        self.assertEqual(299, len(data))  # +62 TOU sensors
+        self.assertEqual(304, len(data))  # +62 TOU sensors + vpv5/ipv5 + vpv6/ipv6 (3 MPPT = 6 PV)
 
         self.sensor_map = {s.id_: s for s in self.sensors()}
 
@@ -1100,7 +1100,7 @@ class GW29K9_ET_Test(EtMock):
         self.loop.run_until_complete(self.read_device_info())
 
         data = self.loop.run_until_complete(self.read_runtime_data())
-        self.assertEqual(273, len(data))  # +62 TOU sensors
+        self.assertEqual(278, len(data))  # +62 TOU sensors + vpv5/ipv5/ppv5 + vpv6/ipv6/ppv6 - vpv4
 
         self.sensor_map = {s.id_: s for s in self.sensors()}
 
