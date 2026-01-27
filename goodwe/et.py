@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from .const import *
 from .exceptions import RequestFailedException, RequestRejectedException
@@ -1191,6 +1192,24 @@ class ET(Inverter):
             self._sensors_map = {s.id_: s for s in self.sensors()}
         return self._sensors_map.get(sensor_id)
 
+    @property
+    def sensor_name_prefix(self) -> str:
+        """
+        Generate entity ID prefix based on last 4 characters of serial number.
+
+        Used to distinguish multiple inverters in parallel systems in Home Assistant.
+        Format: GWxxxx_ where xxxx are last 4 characters of serial number.
+
+        Examples:
+            - Serial 9040KETF00CW0000 → GW0000_
+            - Serial 9040KETF254L0008 → GW0008_
+
+        Returns empty string if serial_number is not yet available.
+        """
+        if self.serial_number and len(self.serial_number) >= 4:
+            return f"GW{self.serial_number[-4:]}_"
+        return ""
+
     def sensors(self) -> tuple[Sensor, ...]:
         # Main runtime sensors (PV, grid, battery power, TOU, etc.)
         result = self._sensors
@@ -1237,6 +1256,114 @@ class ET(Inverter):
         if self._parallel_topology == "slave_in_parallel":
             result = tuple(filter(self._not_slave_only_restricted, result))
         return result
+
+    async def discover_parallel_slaves(self) -> dict[int, dict[str, Any]]:
+        """
+        Auto-discover all slave inverters in a parallel system.
+
+        Reads register 10400 to determine total inverter count, then scans
+        Modbus IDs 1-15 to find slave inverters and read their serial numbers
+        from registers 35003-35010 (8 registers × 2 bytes = 16 ASCII chars).
+
+        Returns:
+            dict mapping Modbus comm_addr to inverter info:
+            {
+                1: {
+                    'serial_number': '9040KETF254L0008',
+                    'comm_addr': 1,
+                    'role': 'slave',
+                    'sensor_prefix': 'GW0008_'
+                },
+                ...
+            }
+
+        Raises:
+            RequestFailedException: If master inverter not accessible
+            ValueError: If not in parallel system
+
+        Example:
+            master = await goodwe.connect('10.10.20.91', 247)
+            slaves = await master.discover_parallel_slaves()
+            print(f"Found {len(slaves)} slave inverters")
+            for addr, info in slaves.items():
+                print(f"  Slave {addr}: {info['serial_number']}")
+        """
+        # Ensure we have device info (serial number, parallel count)
+        if not self.serial_number:
+            await self.read_device_info()
+
+        # Check if this is a parallel system
+        if not self._has_parallel:
+            raise ValueError(
+                f"Inverter {self.serial_number} is not in a parallel system "
+                f"(_has_parallel={self._has_parallel})"
+            )
+
+        # Read total inverter count from register 10400
+        try:
+            response = await self._read_from_socket(self._read_command(10400, 1))
+            total_inverters = int.from_bytes(response, byteorder='big')
+            logger.info(f"Parallel system has {total_inverters} inverters total")
+        except Exception as e:
+            raise RequestFailedException(
+                f"Failed to read parallel inverter count from register 10400: {e}"
+            ) from e
+
+        if total_inverters <= 1:
+            logger.warning(f"Parallel count is {total_inverters}, no slaves to discover")
+            return {}
+
+        # Expected number of slaves (total - 1 master)
+        expected_slaves = total_inverters - 1
+
+        # Scan Modbus IDs 1-15 to find slaves
+        discovered_slaves = {}
+
+        for comm_addr in range(1, 16):  # Modbus slave IDs typically 1-15
+            if len(discovered_slaves) >= expected_slaves:
+                break  # Found all expected slaves
+
+            try:
+                # Try to read serial number from registers 35003-35010 (8 registers)
+                # Create temporary connection with different comm_addr
+                from .protocol import ModbusRtuReadCommand
+                command = ModbusRtuReadCommand(comm_addr, 35003, 8)
+                response = await self._read_from_socket(command)
+
+                # Decode serial number (16 ASCII characters from 8 registers)
+                serial_bytes = bytes(response)
+                serial_number = serial_bytes.decode('ascii', errors='ignore').rstrip('\x00')
+
+                if serial_number and len(serial_number) >= 4:
+                    # Valid serial number found - this is a slave
+                    sensor_prefix = f"GW{serial_number[-4:]}_"
+
+                    discovered_slaves[comm_addr] = {
+                        'serial_number': serial_number,
+                        'comm_addr': comm_addr,
+                        'role': 'slave',
+                        'sensor_prefix': sensor_prefix
+                    }
+
+                    logger.info(
+                        f"Found slave inverter at Modbus ID {comm_addr}: "
+                        f"{serial_number} (prefix: {sensor_prefix})"
+                    )
+                else:
+                    logger.debug(f"Modbus ID {comm_addr}: Invalid serial number")
+
+            except Exception as e:
+                logger.debug(f"Modbus ID {comm_addr}: No response ({type(e).__name__})")
+                continue
+
+        # Verify we found all expected slaves
+        if len(discovered_slaves) != expected_slaves:
+            logger.warning(
+                f"Expected {expected_slaves} slaves but found {len(discovered_slaves)}: "
+                f"{list(discovered_slaves.keys())}"
+            )
+
+        return discovered_slaves
 
     async def _clear_battery_mode_param(self) -> None:
         await self._read_from_socket(self._write_command(0xb9ad, 1))
