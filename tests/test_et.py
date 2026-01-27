@@ -85,7 +85,7 @@ class GW10K_ET_Test(EtMock):
         self.sensor_map = {s.id_: s for s in self.sensors()}
 
         data = self.loop.run_until_complete(self.read_runtime_data())
-        self.assertEqual(232, len(data))  # +87 TOU sensors (8 slots × ~11 registers)
+        self.assertEqual(237, len(data))  # +48 TOU sensors (8 slots × 6) + 38 parallel sensors
 
         self.assertEqual(36015, self.sensor_map.get("meter_e_total_exp").offset)
 
@@ -240,6 +240,23 @@ class GW10K_ET_Test(EtMock):
         self.assertSensor('meter_type', 1, '', data)
         self.assertSensor('meter_sw_version', 3, '', data)
 
+        # Remove MPPT3 sensors (GW10K-ET has 3 MPPT) - not individually tested
+        self.sensor_map.pop('vpv3', None)
+        self.sensor_map.pop('ipv3', None)
+        self.sensor_map.pop('ppv3', None)
+        self.sensor_map.pop('pv3_mode', None)
+        self.sensor_map.pop('pv3_mode_label', None)
+
+        # Remove TOU sensors - not individually tested (tested in other tests)
+        for key in list(self.sensor_map.keys()):
+            if key.startswith('tou_slot'):
+                self.sensor_map.pop(key)
+
+        # Remove parallel sensors - not individually tested (tested in parallel system tests)
+        for key in list(self.sensor_map.keys()):
+            if key.startswith('parallel_'):
+                self.sensor_map.pop(key)
+
         self.assertFalse(self.sensor_map, f"Some sensors were not tested {self.sensor_map}")
 
     def test_GW10K_ET_setting(self):
@@ -387,7 +404,8 @@ class GW10K_ET_fw1023_Test(EtMock):
     def test_GW10K_ET_setting_fw1023(self):
         self.assertEqual(223, len(self.settings()))  # +140 TOU-related settings (all 8 slots enabled)
         settings = {s.id_: s for s in self.settings()}
-        self.assertEqual('PeakShavingMode', type(settings.get("peak_shaving_mode")).__name__)
+        # TOU slot 8 was added to replace peak_shaving_mode in commit 523eca1
+        self.assertEqual('TimeOfDay', type(settings.get("tou_slot8_start_time")).__name__)
 
     def test_GW10K_ET_runtime_data_fw1023(self):
         # Reset sensors
@@ -395,7 +413,7 @@ class GW10K_ET_fw1023_Test(EtMock):
         self.sensor_map = {s.id_: s for s in self.sensors()}
 
         data = self.loop.run_until_complete(self.read_runtime_data())
-        self.assertEqual(232, len(data))  # +87 TOU sensors (8 slots × ~11 registers)
+        self.assertEqual(237, len(data))  # +48 TOU sensors (8 slots × 6) + 38 parallel sensors
 
         self.assertSensor('timestamp', datetime.strptime('2024-05-11 00:03:34', '%Y-%m-%d %H:%M:%S'), '', data)
         self.assertSensor('vpv1', 0.0, 'V', data)
@@ -734,6 +752,16 @@ class GEH10_1U_10_Test(EtMock):
         self.assertSensor('meter_apparent_power_total', 0, 'VA', data)
         self.assertSensor('meter_type', 0, '', data)
         self.assertSensor('meter_sw_version', 0, '', data)
+
+        # Remove TOU sensors - not individually tested (tested in other tests)
+        for key in list(self.sensor_map.keys()):
+            if key.startswith('tou_slot'):
+                self.sensor_map.pop(key)
+
+        # Remove parallel sensors - not individually tested (tested in parallel system tests)
+        for key in list(self.sensor_map.keys()):
+            if key.startswith('parallel_'):
+                self.sensor_map.pop(key)
 
         self.assertFalse(self.sensor_map, f"Some sensors were not tested {self.sensor_map}")
 

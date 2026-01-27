@@ -7,7 +7,7 @@ from .const import *
 from .exceptions import RequestFailedException, RequestRejectedException
 from .inverter import Inverter, OperationMode, SensorKind as Kind
 from .modbus import ILLEGAL_DATA_ADDRESS
-from .model import is_2_battery, is_3_mppt, is_4_mppt, is_745_platform, is_single_phase
+from .model import is_1_battery, is_2_battery, is_3_mppt, is_4_mppt, is_745_platform, is_single_phase
 from .protocol import ProtocolCommand
 from .sensor import *
 
@@ -821,8 +821,15 @@ class ET(Inverter):
             self._sensors = tuple(filter(self._single_phase_only, self._sensors))
             self._sensors_meter = tuple(filter(self._single_phase_only, self._sensors_meter))
 
-        if is_2_battery(self) or self.rated_power >= 25000:
+        # Battery configuration detection (deterministic by model, no fallbacks)
+        # Most ET models have 1 battery input, only ET 25-30kW models have 2
+        # Note: Battery2 defaults to False (line ~726), only explicitly enabled for 2-battery models
+        if is_2_battery(self):
             self._has_battery2 = True
+            logger.debug("Model has 2 battery inputs (ET 25-30kW series)")
+        elif is_1_battery(self):
+            self._has_battery2 = False
+            logger.debug("Model has 1 battery input (confirmed by model detection)")
 
         if is_745_platform(self) or self.rated_power >= 15000:
             self._has_mppt = True
