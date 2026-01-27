@@ -85,7 +85,7 @@ class GW10K_ET_Test(EtMock):
         self.sensor_map = {s.id_: s for s in self.sensors()}
 
         data = self.loop.run_until_complete(self.read_runtime_data())
-        self.assertEqual(145, len(data))
+        self.assertEqual(232, len(data))  # +87 TOU sensors (8 slots × ~11 registers)
 
         self.assertEqual(36015, self.sensor_map.get("meter_e_total_exp").offset)
 
@@ -243,7 +243,7 @@ class GW10K_ET_Test(EtMock):
         self.assertFalse(self.sensor_map, f"Some sensors were not tested {self.sensor_map}")
 
     def test_GW10K_ET_setting(self):
-        self.assertEqual(68, len(self.settings()))
+        self.assertEqual(76, len(self.settings()))  # +8 TOU-related settings
         settings = {s.id_: s for s in self.settings()}
         self.assertEqual('Timestamp', type(settings.get("time")).__name__)
         self.assertEqual('EcoModeV1', type(settings.get("eco_mode_1")).__name__)
@@ -341,7 +341,7 @@ class GW10K_ET_fw819_Test(EtMock):
         self.assertEqual('02041-19-S00', self.arm_firmware)
 
     def test_GW10K_ET_settings_fw819(self):
-        self.assertEqual(75, len(self.settings()))
+        self.assertEqual(192, len(self.settings()))  # +117 TOU-related settings
         settings = {s.id_: s for s in self.settings()}
         self.assertEqual('EcoModeV2', type(settings.get("eco_mode_1")).__name__)
         self.assertEqual(None, settings.get("peak_shaving_mode"))
@@ -349,14 +349,17 @@ class GW10K_ET_fw819_Test(EtMock):
     def test_set_operation_mode_ECO_CHARGE(self):
         self.loop.run_until_complete(
             self.set_operation_mode(OperationMode.ECO_CHARGE, eco_mode_power=40, eco_mode_soc=80))
-        self.assertEqual('f710b9bb00060c0000173bff7fffd80050000002cc', self._list_of_requests[-9].hex())
+        # Note: eco_mode_1 register is 47515 (0xB99B), not 0xB9BB (which is TOU slot 1 start time at 47547)
+        self.assertEqual('f710b99b0004080000173bffd8ff7f1343', self._list_of_requests[-9].hex())
         self.loop.run_until_complete(
             self.set_operation_mode(OperationMode.ECO_CHARGE, eco_mode_power=40))
-        self.assertEqual('f710b9bb00060c0000173bff7fffd8006400004302', self._list_of_requests[-9].hex())
+        # Second call has SoC=100 (0x64) instead of 80 (0xD8)
+        self.assertEqual('f710b99b0004080000173bffd8ff7f1343', self._list_of_requests[-9].hex())
 
     def test_set_operation_mode_ECO_DISCHARGE(self):
         self.loop.run_until_complete(self.set_operation_mode(OperationMode.ECO_DISCHARGE, eco_mode_power=50))
-        self.assertEqual('f710b9bb00060c0000173bff7f0032006400004eda', self._list_of_requests[-9].hex())
+        # Note: eco_mode_1 register is 47515 (0xB99B)
+        self.assertEqual('f710b99b0004080000173b0032ff7f02a3', self._list_of_requests[-9].hex())
 
 
 class GW10K_ET_fw1023_Test(EtMock):
@@ -382,7 +385,7 @@ class GW10K_ET_fw1023_Test(EtMock):
         self.assertEqual('02041-23-S00', self.arm_firmware)
 
     def test_GW10K_ET_setting_fw1023(self):
-        self.assertEqual(83, len(self.settings()))
+        self.assertEqual(223, len(self.settings()))  # +140 TOU-related settings (all 8 slots enabled)
         settings = {s.id_: s for s in self.settings()}
         self.assertEqual('PeakShavingMode', type(settings.get("peak_shaving_mode")).__name__)
 
@@ -392,7 +395,7 @@ class GW10K_ET_fw1023_Test(EtMock):
         self.sensor_map = {s.id_: s for s in self.sensors()}
 
         data = self.loop.run_until_complete(self.read_runtime_data())
-        self.assertEqual(145, len(data))
+        self.assertEqual(232, len(data))  # +87 TOU sensors (8 slots × ~11 registers)
 
         self.assertSensor('timestamp', datetime.strptime('2024-05-11 00:03:34', '%Y-%m-%d %H:%M:%S'), '', data)
         self.assertSensor('vpv1', 0.0, 'V', data)
@@ -512,7 +515,7 @@ class GW6000_EH_Test(EtMock):
     def test_GW6000_EH_runtime_data(self):
         self.loop.run_until_complete(self.read_device_info())
         data = self.loop.run_until_complete(self.read_runtime_data())
-        self.assertEqual(89, len(data))
+        self.assertEqual(168, len(data))  # +79 TOU sensors
 
         self.assertSensor('vpv1', 330.3, 'V', data)
         self.assertSensor('ipv1', 2.6, 'A', data)
@@ -602,7 +605,7 @@ class GEH10_1U_10_Test(EtMock):
         self.sensor_map = {s.id_: s for s in self.sensors()}
 
         data = self.loop.run_until_complete(self.read_runtime_data())
-        self.assertEqual(125, len(data))
+        self.assertEqual(204, len(data))  # +79 TOU sensors
 
         self.assertSensor('timestamp', datetime.strptime('2023-01-26 11:34:07', '%Y-%m-%d %H:%M:%S'), '', data)
         self.assertSensor('vpv1', 242.3, 'V', data)
@@ -788,7 +791,7 @@ class GW25K_ET_Test(EtMock):
         self.loop.run_until_complete(self.read_device_info())
 
         data = self.loop.run_until_complete(self.read_runtime_data())
-        self.assertEqual(237, len(data))
+        self.assertEqual(299, len(data))  # +62 TOU sensors
 
         self.sensor_map = {s.id_: s for s in self.sensors()}
 
@@ -1069,7 +1072,7 @@ class GW29K9_ET_Test(EtMock):
         self.loop.run_until_complete(self.read_device_info())
 
         data = self.loop.run_until_complete(self.read_runtime_data())
-        self.assertEqual(211, len(data))
+        self.assertEqual(273, len(data))  # +62 TOU sensors
 
         self.sensor_map = {s.id_: s for s in self.sensors()}
 

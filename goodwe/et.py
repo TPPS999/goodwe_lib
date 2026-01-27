@@ -729,7 +729,8 @@ class ET(Inverter):
         self._has_meter_extended2: bool = False
         self._has_mppt: bool = False
         self._has_parallel: bool = False
-        self._has_ems: bool = True
+        # Parallel system topology detection (auto-detected on first ILLEGAL_DATA_ADDRESS)
+        self._parallel_topology: str = "standalone"  # "standalone", "master_in_parallel", "slave_in_parallel"
         self._sensors = self.__all_sensors
         self._sensors_battery = self.__all_sensors_battery
         self._sensors_battery2 = self.__all_sensors_battery2
@@ -755,9 +756,34 @@ class ET(Inverter):
         return s.offset < 36058
 
     @staticmethod
-    def _not_ems(s: Sensor) -> bool:
-        """Filter to exclude EMS sensors (registers 47500-47800)"""
-        return not (47500 <= s.offset <= 47800)
+    def _not_slave_only_restricted(s: Sensor) -> bool:
+        """Filter to exclude registers that SLAVE inverters in parallel systems cannot access.
+
+        Slave inverters in parallel systems don't have access to:
+        - Battery Info (36000-36149) - master aggregates battery data
+        - Meter Data (36995-37074) - meter connected to master only
+        - Battery Settings (47500-47546) - master controls battery
+        - EMS/TOU Settings (47547-47650) - master manages EMS/TOU
+        - Parallel System global data (10400-10411) - master manages system coordination
+
+        Note: Standalone and master_in_parallel inverters have access to all these registers
+        (except parallel system registers which don't exist on standalone).
+        """
+        return not (
+            (36000 <= s.offset <= 36149) or  # Battery Info
+            (36995 <= s.offset <= 37074) or  # Meter Data
+            (47500 <= s.offset <= 47650) or  # Battery Settings + EMS/TOU
+            (10400 <= s.offset <= 10411)     # Parallel System (global data)
+        )
+
+    @staticmethod
+    def _not_parallel_system(s: Sensor) -> bool:
+        """Filter to exclude parallel system registers (10400-10485).
+
+        These registers only exist on inverters in parallel systems (master or slave with data).
+        Standalone inverters don't have these registers.
+        """
+        return not (10400 <= s.offset <= 10485)
 
     async def read_device_info(self):
         response = await self._read_from_socket(self._READ_DEVICE_VERSION_INFO)
@@ -972,16 +998,28 @@ class ET(Inverter):
     async def read_setting(self, setting_id: str) -> Any:
         setting: Sensor = self._settings.get(setting_id)
         if setting:
-            # Check if this is an EMS register and EMS is disabled
-            if not self._has_ems and 47500 <= setting.offset <= 47800:
+            # Check if we already know this register is inaccessible
+            if self._parallel_topology == "slave_in_parallel" and not self._not_slave_only_restricted(setting):
                 raise RequestRejectedException(ILLEGAL_DATA_ADDRESS)
             try:
                 return await self._read_sensor(setting)
             except RequestRejectedException as ex:
-                # EMS registers (47500-47800) are master-only in parallel systems
-                if ex.message == ILLEGAL_DATA_ADDRESS and 47500 <= setting.offset <= 47800:
-                    logger.info("EMS values not supported (slave inverter?), disabling further attempts.")
-                    self._has_ems = False
+                # Auto-detect parallel system topology by ILLEGAL_DATA_ADDRESS
+                if ex.message == ILLEGAL_DATA_ADDRESS:
+                    # If slave-only-restricted register fails, we're a slave in parallel system
+                    if not self._not_slave_only_restricted(setting):
+                        logger.info(
+                            f"Register {setting.offset} not accessible - detected SLAVE inverter in parallel system. "
+                            "Filtering out battery info, meter, EMS, and master-only parallel registers."
+                        )
+                        self._parallel_topology = "slave_in_parallel"
+                    # If parallel system register fails on standalone, mark as standalone (no parallel)
+                    elif not self._not_parallel_system(setting) and self._parallel_topology == "standalone":
+                        logger.info(
+                            f"Parallel system register {setting.offset} not accessible - confirmed STANDALONE inverter. "
+                            "Parallel system registers don't exist on this device."
+                        )
+                        # Keep as standalone, just note that parallel registers don't exist
                 raise ex
         if setting_id.startswith("modbus"):
             response = await self._read_from_socket(self._read_command(int(setting_id[7:]), 1))
@@ -1131,26 +1169,50 @@ class ET(Inverter):
         return self._sensors_map.get(sensor_id)
 
     def sensors(self) -> tuple[Sensor, ...]:
+        # Main runtime sensors (PV, grid, battery power, TOU, etc.)
         result = self._sensors
-        # Filter EMS sensors if not supported (slave inverters in parallel systems)
-        if not self._has_ems:
-            result = tuple(filter(self._not_ems, result))
-        result = result + self._sensors_meter
-        if self._has_battery:
+
+        # Filter slave-restricted sensors if this is a slave in parallel system
+        if self._parallel_topology == "slave_in_parallel":
+            result = tuple(filter(self._not_slave_only_restricted, result))
+
+        # Meter data sensors
+        # - Available on standalone and master_in_parallel
+        # - NOT available on slave_in_parallel (meter connected to master only)
+        if self._parallel_topology != "slave_in_parallel":
+            result = result + self._sensors_meter
+
+        # Battery info sensors (36000-36149)
+        # - Available on standalone and master_in_parallel
+        # - NOT available on slave_in_parallel (master aggregates battery data)
+        if self._has_battery and self._parallel_topology != "slave_in_parallel":
             result = result + self._sensors_battery
-        if self._has_battery2:
+        if self._has_battery2 and self._parallel_topology != "slave_in_parallel":
             result = result + self._sensors_battery2
+
+        # MPPT sensors - available on all topologies
         if self._has_mppt:
             result = result + self._sensors_mppt
+
+        # Parallel system sensors (10400-10485)
+        # - NOT available on standalone (registers don't exist)
+        # - Available on master_in_parallel (all registers)
+        # - Partially available on slave_in_parallel (10412+, not 10400-10411)
         if self._has_parallel:
-            result = result + self._sensors_parallel
+            parallel_sensors = self._sensors_parallel
+            # Filter master-only parallel registers on slave (10400-10411: global system data)
+            if self._parallel_topology == "slave_in_parallel":
+                parallel_sensors = tuple(filter(self._not_slave_only_restricted, parallel_sensors))
+            result = result + parallel_sensors
+
         return result
 
     def settings(self) -> tuple[Sensor, ...]:
         result = tuple(self._settings.values())
-        # Filter EMS settings if not supported (slave inverters in parallel systems)
-        if not self._has_ems:
-            result = tuple(filter(self._not_ems, result))
+        # Filter slave-restricted settings if this is a slave in parallel system
+        # (battery settings, EMS/TOU settings, parallel system master-only settings)
+        if self._parallel_topology == "slave_in_parallel":
+            result = tuple(filter(self._not_slave_only_restricted, result))
         return result
 
     async def _clear_battery_mode_param(self) -> None:
