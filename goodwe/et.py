@@ -855,17 +855,50 @@ class ET(Inverter):
             logger.debug("Cannot read _has_peak_shaving settings, disabling it.")
             self._has_peak_shaving = False
 
-        # Check for parallel inverter system support
+        # Detect parallel system topology by reading register 10400 (Inverter Quantity)
+        # This register tells us the system configuration:
+        # - 1: Standalone inverter (no parallel system)
+        # - >1: Master in parallel system (coordinates N inverters)
+        # - ILLEGAL_DATA_ADDRESS: Slave in parallel system (can't access master-only register 10400)
         try:
             response = await self._read_from_socket(self._read_command(10400, 1))
             inverter_quantity = int.from_bytes(response.read(2), byteorder="big", signed=False)
             if inverter_quantity > 1:
-                logger.info("Parallel inverter system detected with %d inverters.", inverter_quantity)
+                # Multiple inverters configured - this is the MASTER in parallel system
+                logger.info(
+                    "Detected MASTER inverter in parallel system with %d inverters. "
+                    "Full access to battery, meter, EMS/TOU, and parallel coordination.",
+                    inverter_quantity
+                )
+                self._parallel_topology = "master_in_parallel"
                 self._has_parallel = True
+            elif inverter_quantity == 1:
+                # Single inverter - STANDALONE system
+                logger.info(
+                    "Detected STANDALONE inverter (single inverter system). "
+                    "Has battery, meter, EMS/TOU access. No parallel system registers."
+                )
+                self._parallel_topology = "standalone"
+                self._has_parallel = False
             else:
-                logger.debug("Single inverter system, parallel sensors not needed.")
-        except (RequestRejectedException, RequestFailedException) as ex:
-            logger.debug("Parallel system registers not supported: %s", ex)
+                # Unexpected value (0 or negative) - treat as standalone
+                logger.warning("Unexpected inverter quantity %d, treating as standalone.", inverter_quantity)
+                self._parallel_topology = "standalone"
+                self._has_parallel = False
+        except RequestRejectedException as ex:
+            if ex.message == ILLEGAL_DATA_ADDRESS:
+                # Can't read register 10400 - this is a SLAVE in parallel system
+                logger.info(
+                    "Register 10400 (Inverter Quantity) not accessible - detected SLAVE inverter in parallel system. "
+                    "Filtering out battery info, meter, EMS/TOU, and master-only parallel registers."
+                )
+                self._parallel_topology = "slave_in_parallel"
+                self._has_parallel = True  # Has some parallel sensors (10412+), but not master-only ones
+            else:
+                raise ex
+        except RequestFailedException as ex:
+            logger.debug("Cannot determine parallel topology (communication error): %s", ex)
+            # Keep default "standalone" topology on communication errors
             self._has_parallel = False
 
     async def read_runtime_data(self) -> dict[str, Any]:
@@ -998,29 +1031,11 @@ class ET(Inverter):
     async def read_setting(self, setting_id: str) -> Any:
         setting: Sensor = self._settings.get(setting_id)
         if setting:
-            # Check if we already know this register is inaccessible
+            # Early exit if we already know this register is inaccessible (slave inverter)
+            # Topology is detected in read_device_info() by reading register 10400
             if self._parallel_topology == "slave_in_parallel" and not self._not_slave_only_restricted(setting):
                 raise RequestRejectedException(ILLEGAL_DATA_ADDRESS)
-            try:
-                return await self._read_sensor(setting)
-            except RequestRejectedException as ex:
-                # Auto-detect parallel system topology by ILLEGAL_DATA_ADDRESS
-                if ex.message == ILLEGAL_DATA_ADDRESS:
-                    # If slave-only-restricted register fails, we're a slave in parallel system
-                    if not self._not_slave_only_restricted(setting):
-                        logger.info(
-                            f"Register {setting.offset} not accessible - detected SLAVE inverter in parallel system. "
-                            "Filtering out battery info, meter, EMS, and master-only parallel registers."
-                        )
-                        self._parallel_topology = "slave_in_parallel"
-                    # If parallel system register fails on standalone, mark as standalone (no parallel)
-                    elif not self._not_parallel_system(setting) and self._parallel_topology == "standalone":
-                        logger.info(
-                            f"Parallel system register {setting.offset} not accessible - confirmed STANDALONE inverter. "
-                            "Parallel system registers don't exist on this device."
-                        )
-                        # Keep as standalone, just note that parallel registers don't exist
-                raise ex
+            return await self._read_sensor(setting)
         if setting_id.startswith("modbus"):
             response = await self._read_from_socket(self._read_command(int(setting_id[7:]), 1))
             return int.from_bytes(response.read(2), byteorder="big", signed=True)
