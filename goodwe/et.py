@@ -768,7 +768,8 @@ class ET(Inverter):
         - Battery Info (36000-36149) - master aggregates battery data
         - Meter Data (36995-37074) - meter connected to master only
         - Battery Settings (47500-47546) - master controls battery
-        - EMS/TOU Settings (47547-47650) - master manages EMS/TOU
+        - EMS/TOU Settings (47547-47591, 47594-47650) - master manages EMS/TOU
+          EXCEPTION: 47592-47593 (Peak Shaving power/SOC slot 8) ARE accessible on slave
         - Parallel System global data (10400-10411) - master manages system coordination
 
         Note: Standalone and master_in_parallel inverters have access to all these registers
@@ -777,9 +778,16 @@ class ET(Inverter):
         return not (
             (36000 <= s.offset <= 36149) or  # Battery Info
             (36995 <= s.offset <= 37074) or  # Meter Data
-            (47500 <= s.offset <= 47650) or  # Battery Settings + EMS/TOU
+            (47500 <= s.offset <= 47546) or  # Battery Settings
+            (47547 <= s.offset <= 47591) or  # EMS/TOU (slots 1-8 start/end/week)
+            (47594 <= s.offset <= 47650) or  # EMS/TOU (slots 8 months + other settings)
             (10400 <= s.offset <= 10411)     # Parallel System (global data)
         )
+        # Registers accessible on SLAVE inverters (intentionally NOT blocked):
+        # - 45353 (battery_charge_current) - Battery charge current limit
+        # - 45355 (battery_discharge_current) - Battery discharge current limit
+        # - 47592 (tou_slot8_param1) - Peak Shaving power limit for slot 8
+        # - 47593 (tou_slot8_param2) - Peak Shaving SOC for slot 8
 
     @staticmethod
     def _not_parallel_system(s: Sensor) -> bool:
