@@ -678,6 +678,10 @@ class ET(Inverter):
     __settings_arm_fw_22: tuple[Sensor, ...] = (
         Long("peak_shaving_power_limit", 47542, "Peak Shaving Power Limit"),
         Integer("peak_shaving_soc", 47544, "Peak Shaving SoC"),
+        # Peak Shaving enable/disable switch (uses same register as TOU slot 8 work week)
+        # 64512 (0xFC00) = Peak shaving enabled, 768 (0x0300) = disabled
+        SwitchValue("peak_shaving_enabled", 47591, "Peak Shaving Enabled",
+                    on_value=64512, off_value=768, kind=Kind.BAT),
         # TOU Slots 5-8 (also in __all_sensors for sensor visibility)
         TimeOfDay("tou_slot5_start_time", 47571, "TOU Slot 5 Start Time", Kind.BAT),
         TimeOfDay("tou_slot5_end_time", 47572, "TOU Slot 5 End Time", Kind.BAT),

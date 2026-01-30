@@ -344,6 +344,34 @@ class IntegerS(Sensor):
         return int.to_bytes(int(value), length=2, byteorder="big", signed=True)
 
 
+class SwitchValue(Sensor):
+    """Sensor representing a switch with custom on/off values.
+
+    Reads as boolean (True/False), writes custom integer values.
+    Used for switches where on/off are represented by specific register values
+    rather than simple 1/0.
+
+    Example: Peak shaving switch uses 64512 (0xFC00) for ON, 768 (0x0300) for OFF.
+    """
+
+    def __init__(self, id_: str, offset: int, name: str,
+                 on_value: int, off_value: int,
+                 unit: str = "", kind: Optional[SensorKind] = None):
+        super().__init__(id_, offset, name, 2, unit, kind)
+        self._on_value = on_value
+        self._off_value = off_value
+
+    def read_value(self, data: ProtocolResponse) -> int:
+        """Read register and return 1 if matches on_value, 0 otherwise."""
+        raw = read_bytes2(data)
+        return 1 if raw == self._on_value else 0
+
+    def encode_value(self, value: Any, register_value: bytes = None) -> bytes:
+        """Encode boolean/int to custom on/off value."""
+        target_value = self._on_value if value else self._off_value
+        return int.to_bytes(target_value, length=2, byteorder="big", signed=False)
+
+
 class Long(Sensor):
     """Sensor representing unsigned int value encoded in 4 bytes"""
 
