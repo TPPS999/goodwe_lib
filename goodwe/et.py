@@ -325,14 +325,14 @@ class ET(Inverter):
         Current("meter_current2", 36056, "Meter L2 Current", Kind.GRID),
         Current("meter_current3", 36057, "Meter L3 Current", Kind.GRID),
 
-        Energy8("meter_e_total_exp1", 36092, "Meter Total Energy (export) L1", Kind.GRID),
-        Energy8("meter_e_total_exp2", 36096, "Meter Total Energy (export) L2", Kind.GRID),
-        Energy8("meter_e_total_exp3", 36100, "Meter Total Energy (export) L3", Kind.GRID),
-        Energy8("meter_e_total_exp", 36104, "Meter Total Energy (export)", Kind.GRID),
-        Energy8("meter_e_total_imp1", 36108, "Meter Total Energy (import) L1", Kind.GRID),
-        Energy8("meter_e_total_imp2", 36112, "Meter Total Energy (import) L2", Kind.GRID),
-        Energy8("meter_e_total_imp3", 36116, "Meter Total Energy (import) L3", Kind.GRID),
-        Energy8("meter_e_total_imp", 36120, "Meter Total Energy (import)", Kind.GRID),
+        Energy8("meter_e_total_exp_l1", 36092, "Meter Total Energy (export) L1", Kind.GRID),
+        Energy8("meter_e_total_exp_l2", 36096, "Meter Total Energy (export) L2", Kind.GRID),
+        Energy8("meter_e_total_exp_l3", 36100, "Meter Total Energy (export) L3", Kind.GRID),
+        Energy8("meter_e_total_exp_sum", 36104, "Meter Total Energy (export) Sum", Kind.GRID),
+        Energy8("meter_e_total_imp_l1", 36108, "Meter Total Energy (import) L1", Kind.GRID),
+        Energy8("meter_e_total_imp_l2", 36112, "Meter Total Energy (import) L2", Kind.GRID),
+        Energy8("meter_e_total_imp_l3", 36116, "Meter Total Energy (import) L3", Kind.GRID),
+        Energy8("meter_e_total_imp_sum", 36120, "Meter Total Energy (import) Sum", Kind.GRID),
     )
 
     # Inverter's MPPT data
