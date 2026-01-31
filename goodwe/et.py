@@ -435,9 +435,13 @@ class ET(Inverter):
         Energy4W("parallel_battery_charge_allow_kwh", 10476, "Master Battery Charge Allow kWh", Kind.BAT),
         Energy4W("parallel_battery_discharge_allow_kwh", 10478, "Master Battery Discharge Allow kWh", Kind.BAT),
         Integer("parallel_able_balance_flag", 10480, "Master Able Balance Flag", "", Kind.BAT),
-        Power4S("parallel_meter_active_power_r", 10481, "Master Meter Active Power R", Kind.GRID),
-        Power4S("parallel_meter_active_power_s", 10483, "Master Meter Active Power S", Kind.GRID),
-        Power4S("parallel_meter_active_power_t", 10485, "Master Meter Active Power T", Kind.GRID),
+        Power4S("parallel_meter_active_power_r", 10481, "Master Meter Active Power L1", Kind.GRID),
+        Power4S("parallel_meter_active_power_s", 10483, "Master Meter Active Power L2", Kind.GRID),
+        Power4S("parallel_meter_active_power_t", 10485, "Master Meter Active Power L3", Kind.GRID),
+        # Calculated current sensors: I = P / V (from meter power and grid voltage)
+        Calculated("parallel_meter_current_l1_calc", "Master Meter Current L1 (calculated)", "A", Kind.GRID),
+        Calculated("parallel_meter_current_l2_calc", "Master Meter Current L2 (calculated)", "A", Kind.GRID),
+        Calculated("parallel_meter_current_l3_calc", "Master Meter Current L3 (calculated)", "A", Kind.GRID),
     )
 
     # Modbus registers of inverter settings, offsets are modbus register addresses
@@ -1028,6 +1032,21 @@ class ET(Inverter):
             try:
                 response = await self._read_from_socket(self._READ_PARALLEL_DATA)
                 data.update(self._map_response(response, self._sensors_parallel))
+                # Calculate meter current from power and voltage: I = P / V
+                # Power sources: parallel_meter_active_power_r/s/t (registers 10481/10483/10485)
+                # Voltage sources: vgrid/vgrid2/vgrid3 (registers 35121/35126/35131)
+                for phase, power_key, voltage_key in [
+                    ("l1", "parallel_meter_active_power_r", "vgrid"),
+                    ("l2", "parallel_meter_active_power_s", "vgrid2"),
+                    ("l3", "parallel_meter_active_power_t", "vgrid3"),
+                ]:
+                    power = data.get(power_key, 0) or 0
+                    voltage = data.get(voltage_key, 0) or 0
+                    if voltage > 0:
+                        current = round(power / voltage, 2)
+                    else:
+                        current = 0.0
+                    data[f"parallel_meter_current_{phase}_calc"] = current
             except RequestRejectedException as ex:
                 if ex.message == ILLEGAL_DATA_ADDRESS:
                     logger.info("Parallel system values not supported, disabling further attempts.")

@@ -372,6 +372,28 @@ class SwitchValue(Sensor):
         return int.to_bytes(target_value, length=2, byteorder="big", signed=False)
 
 
+class Calculated(Sensor):
+    """Virtual sensor for calculated values (not read from registers).
+
+    Used for values derived from other sensors, like current calculated from
+    power and voltage (I = P / V). The actual calculation is done in
+    read_runtime_data() and the value is added to the data dict.
+
+    The offset is set to -1 to indicate this is not a real register.
+    """
+
+    def __init__(self, id_: str, name: str, unit: str = "", kind: Optional[SensorKind] = None):
+        super().__init__(id_, -1, name, 0, unit, kind)
+
+    def read_value(self, data: ProtocolResponse):
+        """Not used - value is calculated externally."""
+        return None
+
+    def encode_value(self, value: Any, register_value: bytes = None) -> bytes:
+        """Not applicable for calculated sensors."""
+        raise NotImplementedError("Calculated sensors cannot be written")
+
+
 class Long(Sensor):
     """Sensor representing unsigned int value encoded in 4 bytes"""
 
