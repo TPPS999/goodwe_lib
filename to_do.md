@@ -1,7 +1,7 @@
 # Plan działania - goodwe_lib
 
 **Data rozpoczęcia:** 2026-01-24 18:32
-**Ostatnia aktualizacja:** 2026-02-01 12:50
+**Ostatnia aktualizacja:** 2026-02-01 13:07
 
 ---
 
@@ -24,7 +24,8 @@
 - ✅ Peak Shaving switch (47591) i Battery Current Limits (45353, 45355) - v0.6.1
 - ✅ Entity ID prefix (GWxxxx_) dla parallel systems - v0.6.0
 - ✅ Auto-discovery parallel slaves - v0.6.0
-- ✅ Observation sensors dla nieudokumentowanych rejestrow (42xxx, 48xxx, 10486-10499)
+- ✅ Observation sensors dla nieudokumentowanych rejestrow (33xxx, 38xxx, 48xxx, 55xxx)
+  - Usunięto udokumentowane zakresy (42xxx, 50xxx)
 
 ### Co jest w trakcie realizacji
 🎯 **Testowanie nowych funkcji na hardware** - v0.6.3 gotowe do testow
@@ -306,6 +307,30 @@ Wszystkie zasady pracy są opisane w [CLAUDE.md](CLAUDE.md):
 ---
 
 ## Historia zmian planu
+
+### 2026-02-01 13:07 - Cleanup: Remove documented registers from observation sensors
+- ✅ Usunięto udokumentowane rejestry 42xxx i 50xxx z observation sensors
+  - **42xxx (Feed Power)**: Rejestr jest w pełni udokumentowany w oficjalnej dokumentacji GoodWe
+    - 42000: EMS Power Mode (0=Self Use, 1=ECO)
+    - 42003/42004: Feed Power Enable/Limit
+    - 42006-42014: Anti-backflow settings
+  - **50xxx (Self-check)**: Rejestr jest w pełni udokumentowany
+    - 50002-50099: Diagnostyka PV/baterii, status sieci, częstotliwość
+- ✅ Pozostawiono tylko naprawdę nieudokumentowane rejestry:
+  - **33xxx (Grid config)**: 33002-33079 nieudokumentowane (tylko 33200+ jest w docs)
+  - **38xxx (Grid phase)**: Całkowicie nieudokumentowane
+  - **48xxx (Slave battery)**: Slave-specific registers nieudokumentowane
+  - **55xxx (Energy counters)**: Nieudokumentowane
+- ✅ Usunięto z kodu:
+  - Tuple definitions `__observation_sensors_42xxx` i `__observation_sensors_50xxx`
+  - Read commands `_READ_OBS_42XXX` i `_READ_OBS_50XXX`
+  - Flags `_observe_42xxx` i `_observe_50xxx`
+  - Sensor assignments `_sensors_obs_42xxx` i `_sensors_obs_50xxx`
+  - Runtime data blocks w `read_runtime_data()`
+  - Sensor method blocks w `sensors()`
+- ✅ Weryfikacja kompilacji Python - OK
+- ✅ Commit: 8214b9b
+- Backup: to_do/202602011307_to_do.md
 
 ### 2026-02-01 12:50 - Observation sensors for undocumented registers
 - ✅ Dodano sensory obserwacyjne dla wszystkich nieudokumentowanych rejestrow
