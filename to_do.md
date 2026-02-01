@@ -1,7 +1,7 @@
 # Plan działania - goodwe_lib
 
 **Data rozpoczęcia:** 2026-01-24 18:32
-**Ostatnia aktualizacja:** 2026-02-01 13:51
+**Ostatnia aktualizacja:** 2026-02-01 13:54
 
 ---
 
@@ -28,7 +28,13 @@
   - Usunięto udokumentowane zakresy (42xxx, 50xxx)
 
 ### Co jest w trakcie realizacji
-🎯 **Testowanie nowych funkcji na hardware** - v0.6.3 gotowe do testow
+🎯 **v0.6.6 - Testowanie i dopracowanie observation sensors**
+- ✅ System parallel działa poprawnie
+- ✅ TypeError naprawiony
+- ⚠️ **Observation sensors nie ładują się** (33xxx, 38xxx, 48xxx, 55xxx)
+  - Reszta systemu startuje bez problemów
+  - Wymaga zbadania dlaczego flagi `_observe_*` nie działają
+  - Możliwe że trzeba ręcznie włączyć: `inverter._observe_48xxx = True`
 
 ### Ostatnie zmiany (2026-01-31 12:30)
 - ✅ **v0.6.3 + custom component v0.9.9.51** - Fix peak_shaving_power_slot8 unit
@@ -78,6 +84,18 @@
   - Commit: 6498ae2 (v0.5.8), 0ea28f6 (custom component)
 
 ### Co jest do zrobienia
+
+#### 0. Dopracowanie observation sensors - **PRIORYTET**
+**Status:** ⚠️ W TRAKCIE
+**Problem:** Observation sensors (33xxx, 38xxx, 48xxx, 55xxx) nie ładują się w HA
+- ✅ Sensory są zdefiniowane w et.py
+- ✅ Flagi `_observe_*` są zainicjalizowane na False
+- ⚠️ Wymaga zbadania:
+  - Czy sensory muszą być ręcznie włączone przez użytkownika
+  - Czy potrzebna jest dedykowana konfiguracja w custom component
+  - Czy read_runtime_data() poprawnie obsługuje te rejestry
+  - Sprawdzić logi HA dla szczegółów błędu
+- **Następny krok:** Analiza logów i mechanizmu włączania observation sensors
 
 #### 1. Inicjalizacja systemu zarządzania projektem
 - ✅ Utworzenie folderu to_do/
