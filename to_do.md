@@ -1,7 +1,7 @@
 # Plan działania - goodwe_lib
 
 **Data rozpoczęcia:** 2026-01-24 18:32
-**Ostatnia aktualizacja:** 2026-02-01 13:07
+**Ostatnia aktualizacja:** 2026-02-01 13:51
 
 ---
 
@@ -307,6 +307,21 @@ Wszystkie zasady pracy są opisane w [CLAUDE.md](CLAUDE.md):
 ---
 
 ## Historia zmian planu
+
+### 2026-02-01 13:51 - Bugfix: TypeError in parallel sensors (v0.6.6)
+- ✅ Naprawiono krytyczny błąd TypeError: 'str' object is not callable
+  - **Problem:** Calculated sensors w __all_sensors_parallel (linie 442-444) nie miały funkcji getter
+  - **Przyczyna:** Sensory Calculated wymagają callable jako drugi parametr, ale zostały zdefiniowane tylko z nazwą
+  - **Skutek:** Błąd w _map_response() podczas odczytu parallel data (linia 1149)
+- ✅ **Rozwiązanie:** Usunięto błędne sensory Calculated z __all_sensors_parallel
+  - Wartości calculated są już obliczane w read_runtime_data() (linie 1150-1164)
+  - Dodawane bezpośrednio do data dict: parallel_meter_current_l1/l2/l3_calc
+  - Nie potrzebują definicji sensorów w tuple
+- ✅ Wersje finalne:
+  - goodwe_lib: v0.6.6 (tag pushed)
+  - custom_components/goodwe: v0.9.9.55
+- ✅ Wszystkie commity pushed, gotowe do testowania
+- Backup: to_do/202602011352_to_do.md
 
 ### 2026-02-01 13:07 - Cleanup: Remove documented registers from observation sensors
 - ✅ Usunięto udokumentowane rejestry 42xxx i 50xxx z observation sensors
