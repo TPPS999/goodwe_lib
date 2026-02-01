@@ -442,6 +442,79 @@ class ET(Inverter):
         Calculated("parallel_meter_current_l1_calc", "Master Meter Current L1 (calculated)", "A", Kind.GRID),
         Calculated("parallel_meter_current_l2_calc", "Master Meter Current L2 (calculated)", "A", Kind.GRID),
         Calculated("parallel_meter_current_l3_calc", "Master Meter Current L3 (calculated)", "A", Kind.GRID),
+        # Undocumented parallel registers 10486-10499 (observed with data)
+        Integer("parallel_unknown_10486", 10486, "Parallel Unknown 10486", "", Kind.AC),
+        Integer("parallel_unknown_10487", 10487, "Parallel Unknown 10487", "", Kind.AC),
+        Integer("parallel_unknown_10488", 10488, "Parallel Unknown 10488", "", Kind.AC),
+        Integer("parallel_unknown_10489", 10489, "Parallel Unknown 10489", "", Kind.AC),
+        Integer("parallel_unknown_10490", 10490, "Parallel Unknown 10490", "", Kind.AC),
+        Integer("parallel_unknown_10491", 10491, "Parallel Unknown 10491", "", Kind.AC),
+        Integer("parallel_unknown_10492", 10492, "Parallel Unknown 10492", "", Kind.AC),
+        Integer("parallel_unknown_10493", 10493, "Parallel Unknown 10493", "", Kind.AC),
+        Integer("parallel_unknown_10494", 10494, "Parallel Unknown 10494", "", Kind.AC),
+        Integer("parallel_unknown_10495", 10495, "Parallel Unknown 10495", "", Kind.AC),
+        Integer("parallel_unknown_10496", 10496, "Parallel Unknown 10496", "", Kind.AC),
+        Integer("parallel_unknown_10497", 10497, "Parallel Unknown 10497", "", Kind.AC),
+        Integer("parallel_unknown_10498", 10498, "Parallel Unknown 10498", "", Kind.AC),
+        Integer("parallel_unknown_10499", 10499, "Parallel Unknown 10499", "", Kind.AC),
+    )
+
+    # Undocumented sensors for observation - 42xxx block (Feed Power for >30kW/parallel systems)
+    # These registers appear on large inverters and parallel systems
+    # 42003 = Grid Export Enable, 42004+42005 = 32-bit Grid Export Limit value
+    __observation_sensors_42xxx: tuple[Sensor, ...] = (
+        Integer("obs_42000", 42000, "Obs 42000 (Unknown)", "", Kind.GRID),
+        Integer("obs_42001", 42001, "Obs 42001 (Unknown)", "", Kind.GRID),
+        Integer("obs_42002", 42002, "Obs 42002 (Unknown)", "", Kind.GRID),
+        Integer("obs_grid_export_32", 42003, "Obs Grid Export Enable (32-bit)", "", Kind.GRID),
+        Power4S("obs_grid_export_limit_32", 42004, "Obs Grid Export Limit (32-bit)", Kind.GRID),
+        Integer("obs_42006", 42006, "Obs 42006 (Unknown)", "", Kind.GRID),
+        Integer("obs_42007", 42007, "Obs 42007 (Unknown)", "", Kind.GRID),
+        Integer("obs_42008", 42008, "Obs 42008 (Unknown)", "", Kind.GRID),
+        Integer("obs_42009", 42009, "Obs 42009 (Unknown)", "", Kind.GRID),
+        Integer("obs_42010", 42010, "Obs 42010 (Unknown)", "", Kind.GRID),
+        Integer("obs_42011", 42011, "Obs 42011 (Unknown)", "", Kind.GRID),
+        Integer("obs_42012", 42012, "Obs 42012 (Unknown)", "", Kind.GRID),
+        # Note: 42200 is in a separate range, not included in the single read command
+    )
+
+    # Undocumented sensors for observation - 48xxx block (Slave-specific battery data)
+    # These registers contain battery information readable from slave inverters
+    # Key registers: 48011=discharge limit, 48012=charge limit, 48013=SOC
+    __observation_sensors_48xxx: tuple[Sensor, ...] = (
+        Long("obs_48000", 48000, "Obs 48000 (Battery Info)", "", Kind.BAT),
+        Long("obs_48002", 48002, "Obs 48002 (Battery Energy?)", "", Kind.BAT),
+        Integer("obs_48004", 48004, "Obs 48004 (Unknown)", "", Kind.BAT),
+        Long("obs_48005", 48005, "Obs 48005 (Capacity?)", "", Kind.BAT),
+        Integer("obs_48007", 48007, "Obs 48007 (Unknown)", "", Kind.BAT),
+        Long("obs_48008", 48008, "Obs 48008 (Energy?)", "", Kind.BAT),
+        Long("obs_48010", 48010, "Obs 48010 (Energy?)", "", Kind.BAT),
+        Integer("obs_battery_discharge_limit", 48011, "Obs Battery Discharge Current Limit", "A", Kind.BAT),
+        Integer("obs_battery_charge_limit", 48012, "Obs Battery Charge Current Limit", "A", Kind.BAT),
+        Integer("obs_battery_soc_48013", 48013, "Obs Battery SOC (Slave)", "%", Kind.BAT),
+        Integer("obs_48014", 48014, "Obs 48014 (Voltage?)", "", Kind.BAT),
+        Integer("obs_48015", 48015, "Obs 48015 (Voltage?)", "", Kind.BAT),
+        Integer("obs_48016", 48016, "Obs 48016 (Voltage?)", "", Kind.BAT),
+        Integer("obs_48017", 48017, "Obs 48017 (Status?)", "", Kind.BAT),
+        Long("obs_48018", 48018, "Obs 48018 (Power?)", "", Kind.BAT),
+        Long("obs_48020", 48020, "Obs 48020 (Power?)", "", Kind.BAT),
+        Integer("obs_48022", 48022, "Obs 48022 (Voltage?)", "", Kind.BAT),
+        Integer("obs_48023", 48023, "Obs 48023 (Voltage?)", "", Kind.BAT),
+        Integer("obs_48024", 48024, "Obs 48024 (Voltage?)", "", Kind.BAT),
+        Integer("obs_48025", 48025, "Obs 48025 (Unknown)", "", Kind.BAT),
+        Integer("obs_48026", 48026, "Obs 48026 (Unknown)", "", Kind.BAT),
+        # 48046-48076 contain additional battery data (voltages, powers)
+        Long("obs_48046", 48046, "Obs 48046 (Power?)", "", Kind.BAT),
+        Long("obs_48048", 48048, "Obs 48048 (Power?)", "", Kind.BAT),
+        Long("obs_48050", 48050, "Obs 48050 (Power?)", "", Kind.BAT),
+        Long("obs_48052", 48052, "Obs 48052 (Power?)", "", Kind.BAT),
+        Long("obs_48054", 48054, "Obs 48054 (Energy?)", "", Kind.BAT),
+        Long("obs_48056", 48056, "Obs 48056 (Energy?)", "", Kind.BAT),
+        Long("obs_48058", 48058, "Obs 48058 (Energy?)", "", Kind.BAT),
+        Long("obs_48060", 48060, "Obs 48060 (Energy?)", "", Kind.BAT),
+        Integer("obs_48064", 48064, "Obs 48064 (Status?)", "", Kind.BAT),
+        Integer("obs_48065", 48065, "Obs 48065 (Unknown)", "", Kind.BAT),
+        Integer("obs_48066", 48066, "Obs 48066 (Capacity?)", "", Kind.BAT),
     )
 
     # Modbus registers of inverter settings, offsets are modbus register addresses
@@ -729,6 +802,9 @@ class ET(Inverter):
         self._READ_BATTERY2_INFO: ProtocolCommand = self._read_command(0x9858, 0x0016)
         self._READ_MPPT_DATA: ProtocolCommand = self._read_command(0x89e5, 0x3d)
         self._READ_PARALLEL_DATA: ProtocolCommand = self._read_command(0x28a0, 0x56)
+        # Observation registers for undocumented data
+        self._READ_OBS_42XXX: ProtocolCommand = self._read_command(42000, 15)  # 42000-42014
+        self._READ_OBS_48XXX: ProtocolCommand = self._read_command(48000, 67)  # 48000-48066
         self._has_eco_mode_v2: bool = True
         self._has_peak_shaving: bool = True
         self._has_battery: bool = True
@@ -738,6 +814,10 @@ class ET(Inverter):
         self._has_meter_extended2: bool = False
         self._has_mppt: bool = False
         self._has_parallel: bool = False
+        # Observation sensors for undocumented registers (disabled by default)
+        # Set to True to enable observation of these registers for debugging/research
+        self._observe_42xxx: bool = False  # Feed Power registers for >30kW/parallel systems
+        self._observe_48xxx: bool = False  # Slave-specific battery registers
         # Parallel system topology detection (auto-detected on first ILLEGAL_DATA_ADDRESS)
         self._parallel_topology: str = "standalone"  # "standalone", "master_in_parallel", "slave_in_parallel"
         self._sensors = self.__all_sensors
@@ -746,6 +826,8 @@ class ET(Inverter):
         self._sensors_meter = self.__all_sensors_meter
         self._sensors_mppt = self.__all_sensors_mppt
         self._sensors_parallel = self.__all_sensors_parallel
+        self._sensors_obs_42xxx = self.__observation_sensors_42xxx
+        self._sensors_obs_48xxx = self.__observation_sensors_48xxx
         self._settings: dict[str, Sensor] = {s.id_: s for s in self.__all_settings}
         self._sensors_map: dict[str, Sensor] | None = None
 
@@ -1054,6 +1136,29 @@ class ET(Inverter):
                 else:
                     raise ex
 
+        # Observation sensors for undocumented registers (disabled by default)
+        if self._observe_42xxx:
+            try:
+                response = await self._read_from_socket(self._READ_OBS_42XXX)
+                data.update(self._map_response(response, self._sensors_obs_42xxx))
+            except RequestRejectedException as ex:
+                if ex.message == ILLEGAL_DATA_ADDRESS:
+                    logger.info("Observation 42xxx values not supported, disabling further attempts.")
+                    self._observe_42xxx = False
+                else:
+                    raise ex
+
+        if self._observe_48xxx:
+            try:
+                response = await self._read_from_socket(self._READ_OBS_48XXX)
+                data.update(self._map_response(response, self._sensors_obs_48xxx))
+            except RequestRejectedException as ex:
+                if ex.message == ILLEGAL_DATA_ADDRESS:
+                    logger.info("Observation 48xxx values not supported, disabling further attempts.")
+                    self._observe_48xxx = False
+                else:
+                    raise ex
+
         # Add inverter serial number as a constant sensor value
         data["serial_number"] = self.serial_number
 
@@ -1277,6 +1382,13 @@ class ET(Inverter):
             if self._parallel_topology == "slave_in_parallel":
                 parallel_sensors = tuple(filter(self._not_slave_only_restricted, parallel_sensors))
             result = result + parallel_sensors
+
+        # Observation sensors for undocumented registers (disabled by default)
+        # Enable by setting inverter._observe_42xxx = True or inverter._observe_48xxx = True
+        if self._observe_42xxx:
+            result = result + self._sensors_obs_42xxx
+        if self._observe_48xxx:
+            result = result + self._sensors_obs_48xxx
 
         return result
 
