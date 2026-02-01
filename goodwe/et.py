@@ -438,10 +438,8 @@ class ET(Inverter):
         Power4S("parallel_meter_active_power_r", 10481, "Master Meter Active Power L1", Kind.GRID),
         Power4S("parallel_meter_active_power_s", 10483, "Master Meter Active Power L2", Kind.GRID),
         Power4S("parallel_meter_active_power_t", 10485, "Master Meter Active Power L3", Kind.GRID),
-        # Calculated current sensors: I = P / V (from meter power and grid voltage)
-        Calculated("parallel_meter_current_l1_calc", "Master Meter Current L1 (calculated)", "A", Kind.GRID),
-        Calculated("parallel_meter_current_l2_calc", "Master Meter Current L2 (calculated)", "A", Kind.GRID),
-        Calculated("parallel_meter_current_l3_calc", "Master Meter Current L3 (calculated)", "A", Kind.GRID),
+        # NOTE: Calculated current sensors (I = P / V) are computed in read_runtime_data()
+        # and added directly to data dict, not read from Modbus registers
         # Undocumented parallel registers 10486-10499 (observed with data)
         Integer("parallel_unknown_10486", 10486, "Parallel Unknown 10486", "", Kind.AC),
         Integer("parallel_unknown_10487", 10487, "Parallel Unknown 10487", "", Kind.AC),
