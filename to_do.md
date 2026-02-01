@@ -1,7 +1,7 @@
 # Plan działania - goodwe_lib
 
 **Data rozpoczęcia:** 2026-01-24 18:32
-**Ostatnia aktualizacja:** 2026-01-25 15:30
+**Ostatnia aktualizacja:** 2026-02-01 12:50
 
 ---
 
@@ -21,8 +21,26 @@
   - ✅ Plik CLAUDE.md z zasadami pracy
   - ✅ Wpisy w .gitignore dla lokalnych plików zarządzania
 
+- ✅ Peak Shaving switch (47591) i Battery Current Limits (45353, 45355) - v0.6.1
+- ✅ Entity ID prefix (GWxxxx_) dla parallel systems - v0.6.0
+- ✅ Auto-discovery parallel slaves - v0.6.0
+- ✅ Observation sensors dla nieudokumentowanych rejestrow (42xxx, 48xxx, 10486-10499)
+
 ### Co jest w trakcie realizacji
-🎯 **Dodanie write support dla TOU** - następny etap po v0.5.9
+🎯 **Testowanie nowych funkcji na hardware** - v0.6.3 gotowe do testow
+
+### Ostatnie zmiany (2026-01-31 12:30)
+- ✅ **v0.6.3 + custom component v0.9.9.51** - Fix peak_shaving_power_slot8 unit
+  - **Problem:** Rejestr 47592 oczekuje wartosci w watach, nie kW
+  - **Rozwiazanie:** Zmiana z KILO_WATT na WATT
+  - **Zmiany w number.py:**
+    - native_unit_of_measurement: KILO_WATT -> WATT
+    - native_step: 0.1 -> 100
+    - native_min_value/max_value: +-40 -> +-40000
+    - Usunieto /10 z mapper i *10 z setter
+  - **Dodano:** Komentarz o parallel systems (wartość wysylana do kazdego invertera osobno)
+  - **Commit:** 91abb33
+- ✅ **Wersje:** goodwe_lib v0.6.3, custom_components/goodwe v0.9.9.51
 
 ### Ostatnie zmiany (2026-01-25 15:30)
 - ✅ **v0.5.9 + custom component v0.9.9.42** - TOU sensors widoczne w Home Assistant
@@ -288,6 +306,56 @@ Wszystkie zasady pracy są opisane w [CLAUDE.md](CLAUDE.md):
 ---
 
 ## Historia zmian planu
+
+### 2026-02-01 12:50 - Observation sensors for undocumented registers
+- ✅ Dodano sensory obserwacyjne dla wszystkich nieudokumentowanych rejestrow
+  - **33xxx (Grid config)**: Limity sieci (33002-33079)
+  - **38xxx (Grid phase)**: Ustawienia faz sieci (38000-38059, 38451-38460)
+  - **42xxx (Feed Power)**: Grid export dla >30kW/parallel systems (42000-42014)
+    - 42003: Grid Export Enable (32-bit)
+    - 42004-42005: Grid Export Limit (32-bit signed)
+  - **48xxx (Slave battery)**: Slave-specific battery registers (48000-48066)
+    - 48011/48012: Battery discharge/charge current limits
+    - 48013: Battery SOC on slave inverter
+  - **50xxx (Grid freq)**: Czestotliwosc/power factor (50000-50099)
+  - **55xxx (Energy)**: Liczniki energii (55252-55281)
+  - **10486-10499**: Undocumented parallel registers
+- ✅ Sensory domyslnie wylaczone - wlaczanie przez:
+  - `inverter._observe_33xxx = True`
+  - `inverter._observe_38xxx = True`
+  - `inverter._observe_42xxx = True`
+  - `inverter._observe_48xxx = True`
+  - `inverter._observe_50xxx = True`
+  - `inverter._observe_55xxx = True`
+- ✅ Cel: Obserwacja zmian wartosci dla reverse engineering
+- ✅ Commits: 819d0a4, dabf231
+- Backup: to_do/202602011245_to_do.md
+
+### 2026-01-31 12:30 - Fix peak_shaving_power_slot8 unit (v0.6.3 -> v0.9.9.51)
+- ✅ Zmiana jednostki z KILO_WATT na WATT dla rejestru 47592
+- ✅ Usunieto przeliczenia /10 i *10 - raw values w watach
+- ✅ native_step zmieniony z 0.1 na 100
+- ✅ Zakres zmieniony z +-40 na +-40000 W
+- ✅ Dodano komentarz o parallel systems
+- ✅ Commit 91abb33 pushed do home-assistant-goodwe-inverter
+- Backup: to_do/202601311230_to_do.md
+
+### 2026-01-30 15:35 - Peak Shaving switch i Battery Current Limits (v0.6.0 -> v0.6.1)
+- ✅ **v0.6.0**: Dodano sensor_name_prefix i auto-discovery dla parallel slaves
+  - Property `sensor_name_prefix` zwraca GWxxxx_ na podstawie ostatnich 4 cyfr serial number
+  - Metoda `discover_parallel_slaves()` - auto-discovery slave'ow w systemach rownoleglych
+  - Przykład: `examples/discover_parallel_system.py`
+  - Custom component: unique_id wszystkich encji zawiera teraz prefix (sensor, number, select, switch, button)
+- ✅ **v0.6.1**: Nowe encje dla Peak Shaving i Battery Current Limits
+  - **SwitchValue** - nowa klasa sensora dla switchy z custom wartosciami on/off
+  - **peak_shaving_enabled** (register 47591): ON=64512 (0xFC00), OFF=768 (0x0300)
+  - **battery_charge_current** (45353) i **battery_discharge_current** (45355) - number entities 0-100A
+- ✅ Wersje finalne:
+  - goodwe_lib: v0.6.1 (tags pushed)
+  - custom_components/goodwe: v0.9.9.47
+- ✅ Gotowe do testowania na rzeczywistym hardware
+- 📝 Organizacja dashboardu: TOU 1-7, Peak Shaving (slot 8), Master values - do konfiguracji w Lovelace przez filtrowanie entity_id
+- Backup: to_do/202601301530_to_do.md
 
 ### 2026-01-25 15:30 - TOU sensors widoczne w Home Assistant (v0.5.9)
 - ✅ Zidentyfikowano problem: TOU sensors w __settings_arm_fw_* zamiast __all_sensors
