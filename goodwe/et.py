@@ -459,25 +459,6 @@ class ET(Inverter):
         Integer("parallel_unknown_10499", 10499, "Parallel Unknown 10499", "", Kind.AC),
     )
 
-    # Undocumented sensors for observation - 42xxx block (Feed Power for >30kW/parallel systems)
-    # These registers appear on large inverters and parallel systems
-    # 42003 = Grid Export Enable, 42004+42005 = 32-bit Grid Export Limit value
-    __observation_sensors_42xxx: tuple[Sensor, ...] = (
-        Integer("obs_42000", 42000, "Obs 42000 (Unknown)", "", Kind.GRID),
-        Integer("obs_42001", 42001, "Obs 42001 (Unknown)", "", Kind.GRID),
-        Integer("obs_42002", 42002, "Obs 42002 (Unknown)", "", Kind.GRID),
-        Integer("obs_grid_export_32", 42003, "Obs Grid Export Enable (32-bit)", "", Kind.GRID),
-        Power4S("obs_grid_export_limit_32", 42004, "Obs Grid Export Limit (32-bit)", Kind.GRID),
-        Integer("obs_42006", 42006, "Obs 42006 (Unknown)", "", Kind.GRID),
-        Integer("obs_42007", 42007, "Obs 42007 (Unknown)", "", Kind.GRID),
-        Integer("obs_42008", 42008, "Obs 42008 (Unknown)", "", Kind.GRID),
-        Integer("obs_42009", 42009, "Obs 42009 (Unknown)", "", Kind.GRID),
-        Integer("obs_42010", 42010, "Obs 42010 (Unknown)", "", Kind.GRID),
-        Integer("obs_42011", 42011, "Obs 42011 (Unknown)", "", Kind.GRID),
-        Integer("obs_42012", 42012, "Obs 42012 (Unknown)", "", Kind.GRID),
-        # Note: 42200 is in a separate range, not included in the single read command
-    )
-
     # Undocumented sensors for observation - 48xxx block (Slave-specific battery data)
     # These registers contain battery information readable from slave inverters
     # Key registers: 48011=discharge limit, 48012=charge limit, 48013=SOC
@@ -548,21 +529,6 @@ class ET(Inverter):
         Integer("obs_38452", 38452, "Obs 38452 (Unknown)", "", Kind.GRID),
         Integer("obs_38453", 38453, "Obs 38453 (Unknown)", "", Kind.GRID),
         Integer("obs_38458", 38458, "Obs 38458 (Unknown)", "", Kind.GRID),
-    )
-
-    # Undocumented sensors - 50xxx block (Grid frequency/power factor?)
-    __observation_sensors_50xxx: tuple[Sensor, ...] = (
-        Integer("obs_50002", 50002, "Obs 50002 (Unknown)", "", Kind.GRID),
-        Integer("obs_50011", 50011, "Obs 50011 (Unknown)", "", Kind.GRID),
-        Integer("obs_50014", 50014, "Obs 50014 (Unknown)", "", Kind.GRID),
-        Integer("obs_50017", 50017, "Obs 50017 (Unknown)", "", Kind.GRID),
-        Integer("obs_50036", 50036, "Obs 50036 (Unknown)", "", Kind.GRID),
-        Integer("obs_50077", 50077, "Obs 50077 (Voltage?)", "", Kind.GRID),
-        Integer("obs_50078", 50078, "Obs 50078 (Voltage?)", "", Kind.GRID),
-        Integer("obs_50079", 50079, "Obs 50079 (Voltage?)", "", Kind.GRID),
-        Integer("obs_50087", 50087, "Obs 50087 (Voltage?)", "", Kind.GRID),
-        Integer("obs_50088", 50088, "Obs 50088 (Voltage?)", "", Kind.GRID),
-        Integer("obs_50089", 50089, "Obs 50089 (Voltage?)", "", Kind.GRID),
     )
 
     # Undocumented sensors - 55xxx block (Energy counters?)
@@ -863,12 +829,10 @@ class ET(Inverter):
         self._READ_MPPT_DATA: ProtocolCommand = self._read_command(0x89e5, 0x3d)
         self._READ_PARALLEL_DATA: ProtocolCommand = self._read_command(0x28a0, 0x56)
         # Observation registers for undocumented data
-        self._READ_OBS_42XXX: ProtocolCommand = self._read_command(42000, 15)  # 42000-42014
         self._READ_OBS_48XXX: ProtocolCommand = self._read_command(48000, 67)  # 48000-48066
         self._READ_OBS_33XXX: ProtocolCommand = self._read_command(33000, 80)  # 33000-33079
         self._READ_OBS_38XXX: ProtocolCommand = self._read_command(38000, 60)  # 38000-38059 + 38451-38458
         self._READ_OBS_38XXX_2: ProtocolCommand = self._read_command(38451, 10)  # 38451-38460
-        self._READ_OBS_50XXX: ProtocolCommand = self._read_command(50000, 100)  # 50000-50099
         self._READ_OBS_55XXX: ProtocolCommand = self._read_command(55252, 30)  # 55252-55281
         self._has_eco_mode_v2: bool = True
         self._has_peak_shaving: bool = True
@@ -881,11 +845,9 @@ class ET(Inverter):
         self._has_parallel: bool = False
         # Observation sensors for undocumented registers (disabled by default)
         # Set to True to enable observation of these registers for debugging/research
-        self._observe_42xxx: bool = False  # Feed Power registers for >30kW/parallel systems
         self._observe_48xxx: bool = False  # Slave-specific battery registers
         self._observe_33xxx: bool = False  # Grid configuration/limits
         self._observe_38xxx: bool = False  # Grid phase settings
-        self._observe_50xxx: bool = False  # Grid frequency/power factor
         self._observe_55xxx: bool = False  # Energy counters
         # Parallel system topology detection (auto-detected on first ILLEGAL_DATA_ADDRESS)
         self._parallel_topology: str = "standalone"  # "standalone", "master_in_parallel", "slave_in_parallel"
@@ -895,11 +857,9 @@ class ET(Inverter):
         self._sensors_meter = self.__all_sensors_meter
         self._sensors_mppt = self.__all_sensors_mppt
         self._sensors_parallel = self.__all_sensors_parallel
-        self._sensors_obs_42xxx = self.__observation_sensors_42xxx
         self._sensors_obs_48xxx = self.__observation_sensors_48xxx
         self._sensors_obs_33xxx = self.__observation_sensors_33xxx
         self._sensors_obs_38xxx = self.__observation_sensors_38xxx
-        self._sensors_obs_50xxx = self.__observation_sensors_50xxx
         self._sensors_obs_55xxx = self.__observation_sensors_55xxx
         self._settings: dict[str, Sensor] = {s.id_: s for s in self.__all_settings}
         self._sensors_map: dict[str, Sensor] | None = None
@@ -1210,17 +1170,6 @@ class ET(Inverter):
                     raise ex
 
         # Observation sensors for undocumented registers (disabled by default)
-        if self._observe_42xxx:
-            try:
-                response = await self._read_from_socket(self._READ_OBS_42XXX)
-                data.update(self._map_response(response, self._sensors_obs_42xxx))
-            except RequestRejectedException as ex:
-                if ex.message == ILLEGAL_DATA_ADDRESS:
-                    logger.info("Observation 42xxx values not supported, disabling further attempts.")
-                    self._observe_42xxx = False
-                else:
-                    raise ex
-
         if self._observe_48xxx:
             try:
                 response = await self._read_from_socket(self._READ_OBS_48XXX)
@@ -1255,17 +1204,6 @@ class ET(Inverter):
                 if ex.message == ILLEGAL_DATA_ADDRESS:
                     logger.info("Observation 38xxx values not supported, disabling further attempts.")
                     self._observe_38xxx = False
-                else:
-                    raise ex
-
-        if self._observe_50xxx:
-            try:
-                response = await self._read_from_socket(self._READ_OBS_50XXX)
-                data.update(self._map_response(response, self._sensors_obs_50xxx))
-            except RequestRejectedException as ex:
-                if ex.message == ILLEGAL_DATA_ADDRESS:
-                    logger.info("Observation 50xxx values not supported, disabling further attempts.")
-                    self._observe_50xxx = False
                 else:
                     raise ex
 
@@ -1505,17 +1443,13 @@ class ET(Inverter):
             result = result + parallel_sensors
 
         # Observation sensors for undocumented registers (disabled by default)
-        # Enable by setting inverter._observe_42xxx = True or inverter._observe_48xxx = True
-        if self._observe_42xxx:
-            result = result + self._sensors_obs_42xxx
+        # Enable by setting inverter._observe_48xxx = True, etc.
         if self._observe_48xxx:
             result = result + self._sensors_obs_48xxx
         if self._observe_33xxx:
             result = result + self._sensors_obs_33xxx
         if self._observe_38xxx:
             result = result + self._sensors_obs_38xxx
-        if self._observe_50xxx:
-            result = result + self._sensors_obs_50xxx
         if self._observe_55xxx:
             result = result + self._sensors_obs_55xxx
 
