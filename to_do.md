@@ -28,13 +28,14 @@
   - Usunięto udokumentowane zakresy (42xxx, 50xxx)
 
 ### Co jest w trakcie realizacji
-🎯 **v0.6.6 - Testowanie i dopracowanie observation sensors**
+🎯 **v0.6.6 / v0.9.9.58 - Observation sensors z persystencją stanu**
 - ✅ System parallel działa poprawnie
 - ✅ TypeError naprawiony
-- ⚠️ **Observation sensors nie ładują się** (33xxx, 38xxx, 48xxx, 55xxx)
-  - Reszta systemu startuje bez problemów
-  - Wymaga zbadania dlaczego flagi `_observe_*` nie działają
-  - Możliwe że trzeba ręcznie włączyć: `inverter._observe_48xxx = True`
+- ✅ **Observation sensors switche z persystencją** (33xxx, 38xxx, 48xxx, 55xxx)
+  - ✅ Switche zapisują swój stan do ConfigEntry.options
+  - ✅ Po restarcie HA inverter przywraca flagi _observe_*xxx z zapisanych opcji
+  - ✅ Sensory pojawiają się po restarcie jeśli switche były włączone
+  - ⚠️ **Wymaga restartu HA** po włączeniu/wyłączeniu switcha (to jest OK)
 
 ### Ostatnie zmiany (2026-01-31 12:30)
 - ✅ **v0.6.3 + custom component v0.9.9.51** - Fix peak_shaving_power_slot8 unit
@@ -85,17 +86,18 @@
 
 ### Co jest do zrobienia
 
-#### 0. Dopracowanie observation sensors - **PRIORYTET**
-**Status:** ⚠️ W TRAKCIE
-**Problem:** Observation sensors (33xxx, 38xxx, 48xxx, 55xxx) nie ładują się w HA
+#### 0. Dopracowanie observation sensors - **ZAKOŃCZONE** ✅
+**Status:** ✅ ZAKOŃCZONE
+**Problem:** Observation sensors (33xxx, 38xxx, 48xxx, 55xxx) wymagają persystencji stanu
 - ✅ Sensory są zdefiniowane w et.py
 - ✅ Flagi `_observe_*` są zainicjalizowane na False
-- ⚠️ Wymaga zbadania:
-  - Czy sensory muszą być ręcznie włączone przez użytkownika
-  - Czy potrzebna jest dedykowana konfiguracja w custom component
-  - Czy read_runtime_data() poprawnie obsługuje te rejestry
-  - Sprawdzić logi HA dla szczegółów błędu
-- **Następny krok:** Analiza logów i mechanizmu włączania observation sensors
+- ✅ **Implementacja switchy z persystencją stanu (v0.9.9.58):**
+  - ✅ 4 switche w custom component do włączania/wyłączania observation sensors
+  - ✅ Switche zapisują swój stan do ConfigEntry.options
+  - ✅ Po restarcie HA inverter przywraca flagi z zapisanych opcji
+  - ✅ Sensory pojawiają się po restarcie jeśli switche były włączone
+  - ℹ️ Wymaga restartu HA po zmianie stanu switcha (to jest OK - standardowe dla HA)
+- **Rezultat:** User może włączyć observation sensors, zrestartować HA i sensory się pojawią
 
 #### 1. Inicjalizacja systemu zarządzania projektem
 - ✅ Utworzenie folderu to_do/
@@ -325,6 +327,29 @@ Wszystkie zasady pracy są opisane w [CLAUDE.md](CLAUDE.md):
 ---
 
 ## Historia zmian planu
+
+### 2026-02-01 14:15 - Fix: Persistent state for observation switches (v0.9.9.58)
+- ✅ **Problem:** Switche observation sensors traciły swój stan po restarcie HA
+  - Flagi `_observe_*xxx` w inverterze były inicjalizowane jako False przy każdym starcie
+  - User włączał switch, ale po restarcie HA wracał do stanu wyłączonego
+- ✅ **Rozwiązanie:** Persystencja stanu przez ConfigEntry.options
+  - **switch.py:**
+    - async_turn_on/off zapisuje stan do `entry.options[OBSERVATION_*XXX]`
+    - Dodano `config_entry` parameter do ObservationSwitchEntity.__init__
+    - Informacja w logu że wymaga restartu HA
+  - **__init__.py:**
+    - Po utworzeniu invertera odczytuje opcje i ustawia flagi:
+      ```python
+      inverter._observe_33xxx = entry.options.get(OBSERVATION_33XXX, False)
+      inverter._observe_38xxx = entry.options.get(OBSERVATION_38XXX, False)
+      inverter._observe_48xxx = entry.options.get(OBSERVATION_48XXX, False)
+      inverter._observe_55xxx = entry.options.get(OBSERVATION_55XXX, False)
+      ```
+- ✅ **Rezultat:** Switche zachowują stan po restarcie HA
+  - User może włączyć switche, zrestartować HA i observation sensors się pojawią
+  - Po wyłączeniu i restarcie sensory znikną
+- ✅ Wersja: custom_components/goodwe v0.9.9.58
+- Backup: to_do/202602011415_to_do.md
 
 ### 2026-02-01 13:51 - Bugfix: TypeError in parallel sensors (v0.6.6)
 - ✅ Naprawiono krytyczny błąd TypeError: 'str' object is not callable
