@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(python -m unittest:*)",
-      "Bash(python -c:*)"
+      "Bash(python -c:*)",
+      "Bash(dir:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: Bump version to 0.6.5\n\nUpdates:\n- Remove documented registers from observation \\(42xxx, 50xxx\\)\n- Keep only undocumented registers \\(33xxx, 38xxx, 48xxx, 55xxx\\)\n- Update to_do.md with cleanup details\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(git push:*)",
+      "Bash(powershell -Command \"Get-Date -Format ''yyyyMMddHHmm''\")",
+      "Bash(git commit:*)",
+      "Bash(powershell -Command \"\\(Get-Content scan_log_20260202_131128.txt | Select-String ''^\\\\[.*\\\\]\\\\s+\\(48\\\\d{3}\\) = 0x''\\).Count\")"
     ]
   }
 }
