@@ -1728,8 +1728,7 @@ class ET(Inverter):
                     data.update(self._map_response(response, self._sensors_obs_48xxx))
             except RequestRejectedException as ex:
                 if ex.message == ILLEGAL_DATA_ADDRESS:
-                    logger.info("Observation 48xxx values not supported, disabling further attempts.")
-                    self._observe_48xxx = False
+                    logger.debug("Observation 48xxx read failed (ILLEGAL_DATA_ADDRESS), will retry on next update.")
                 else:
                     raise ex
 
@@ -1742,8 +1741,7 @@ class ET(Inverter):
                     data.update(self._map_response(response, self._sensors_obs_33xxx))
             except RequestRejectedException as ex:
                 if ex.message == ILLEGAL_DATA_ADDRESS:
-                    logger.info("Observation 33xxx values not supported, disabling further attempts.")
-                    self._observe_33xxx = False
+                    logger.debug("Observation 33xxx read failed (ILLEGAL_DATA_ADDRESS), will retry on next update.")
                 else:
                     raise ex
 
@@ -1756,8 +1754,7 @@ class ET(Inverter):
                     data.update(self._map_response(response, self._sensors_obs_38xxx))
             except RequestRejectedException as ex:
                 if ex.message == ILLEGAL_DATA_ADDRESS:
-                    logger.info("Observation 38xxx values not supported, disabling further attempts.")
-                    self._observe_38xxx = False
+                    logger.debug("Observation 38xxx read failed (ILLEGAL_DATA_ADDRESS), will retry on next update.")
                 else:
                     raise ex
 
@@ -1770,8 +1767,7 @@ class ET(Inverter):
                     data.update(self._map_response(response, self._sensors_obs_55xxx))
             except RequestRejectedException as ex:
                 if ex.message == ILLEGAL_DATA_ADDRESS:
-                    logger.info("Observation 55xxx values not supported, disabling further attempts.")
-                    self._observe_55xxx = False
+                    logger.debug("Observation 55xxx read failed (ILLEGAL_DATA_ADDRESS), will retry on next update.")
                 else:
                     raise ex
 
