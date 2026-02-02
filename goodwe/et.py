@@ -1357,11 +1357,31 @@ class ET(Inverter):
         self._READ_MPPT_DATA: ProtocolCommand = self._read_command(0x89e5, 0x3d)
         self._READ_PARALLEL_DATA: ProtocolCommand = self._read_command(0x28a0, 0x56)
         # Observation registers for undocumented data
-        # Observation sensor commands - expanded ranges from full scan
-        self._READ_OBS_48XXX: ProtocolCommand = self._read_command(48000, 807)  # 48000-48806 (296 registers)
-        self._READ_OBS_33XXX: ProtocolCommand = self._read_command(33000, 502)  # 33000-33501 (110 registers)
-        self._READ_OBS_38XXX: ProtocolCommand = self._read_command(38000, 464)  # 38000-38463 (114 registers)
-        self._READ_OBS_55XXX: ProtocolCommand = self._read_command(55000, 403)  # 55000-55402 (71 registers)
+        # Observation sensor commands - split into blocks (max 125 registers per read due to Modbus limitations)
+        # 48xxx range: 48000-48806 (807 regs total) - split into 7 blocks
+        self._READ_OBS_48XXX_1: ProtocolCommand = self._read_command(48000, 125)   # 48000-48124
+        self._READ_OBS_48XXX_2: ProtocolCommand = self._read_command(48125, 125)   # 48125-48249
+        self._READ_OBS_48XXX_3: ProtocolCommand = self._read_command(48250, 125)   # 48250-48374
+        self._READ_OBS_48XXX_4: ProtocolCommand = self._read_command(48375, 125)   # 48375-48499
+        self._READ_OBS_48XXX_5: ProtocolCommand = self._read_command(48500, 125)   # 48500-48624
+        self._READ_OBS_48XXX_6: ProtocolCommand = self._read_command(48625, 125)   # 48625-48749
+        self._READ_OBS_48XXX_7: ProtocolCommand = self._read_command(48750, 57)    # 48750-48806
+        # 33xxx range: 33000-33501 (502 regs total) - split into 5 blocks
+        self._READ_OBS_33XXX_1: ProtocolCommand = self._read_command(33000, 125)   # 33000-33124
+        self._READ_OBS_33XXX_2: ProtocolCommand = self._read_command(33125, 125)   # 33125-33249
+        self._READ_OBS_33XXX_3: ProtocolCommand = self._read_command(33250, 125)   # 33250-33374
+        self._READ_OBS_33XXX_4: ProtocolCommand = self._read_command(33375, 125)   # 33375-33499
+        self._READ_OBS_33XXX_5: ProtocolCommand = self._read_command(33500, 2)     # 33500-33501
+        # 38xxx range: 38000-38463 (464 regs total) - split into 4 blocks
+        self._READ_OBS_38XXX_1: ProtocolCommand = self._read_command(38000, 125)   # 38000-38124
+        self._READ_OBS_38XXX_2: ProtocolCommand = self._read_command(38125, 125)   # 38125-38249
+        self._READ_OBS_38XXX_3: ProtocolCommand = self._read_command(38250, 125)   # 38250-38374
+        self._READ_OBS_38XXX_4: ProtocolCommand = self._read_command(38375, 89)    # 38375-38463
+        # 55xxx range: 55000-55402 (403 regs total) - split into 4 blocks
+        self._READ_OBS_55XXX_1: ProtocolCommand = self._read_command(55000, 125)   # 55000-55124
+        self._READ_OBS_55XXX_2: ProtocolCommand = self._read_command(55125, 125)   # 55125-55249
+        self._READ_OBS_55XXX_3: ProtocolCommand = self._read_command(55250, 125)   # 55250-55374
+        self._READ_OBS_55XXX_4: ProtocolCommand = self._read_command(55375, 28)    # 55375-55402
         self._has_eco_mode_v2: bool = True
         self._has_peak_shaving: bool = True
         self._has_battery: bool = True
@@ -1700,8 +1720,12 @@ class ET(Inverter):
         # Observation sensors for undocumented registers (disabled by default)
         if self._observe_48xxx:
             try:
-                response = await self._read_from_socket(self._READ_OBS_48XXX)
-                data.update(self._map_response(response, self._sensors_obs_48xxx))
+                # Read 48xxx in 7 blocks (max 125 registers per read)
+                for read_cmd in [self._READ_OBS_48XXX_1, self._READ_OBS_48XXX_2, self._READ_OBS_48XXX_3,
+                                self._READ_OBS_48XXX_4, self._READ_OBS_48XXX_5, self._READ_OBS_48XXX_6,
+                                self._READ_OBS_48XXX_7]:
+                    response = await self._read_from_socket(read_cmd)
+                    data.update(self._map_response(response, self._sensors_obs_48xxx))
             except RequestRejectedException as ex:
                 if ex.message == ILLEGAL_DATA_ADDRESS:
                     logger.info("Observation 48xxx values not supported, disabling further attempts.")
@@ -1711,8 +1735,11 @@ class ET(Inverter):
 
         if self._observe_33xxx:
             try:
-                response = await self._read_from_socket(self._READ_OBS_33XXX)
-                data.update(self._map_response(response, self._sensors_obs_33xxx))
+                # Read 33xxx in 5 blocks (max 125 registers per read)
+                for read_cmd in [self._READ_OBS_33XXX_1, self._READ_OBS_33XXX_2, self._READ_OBS_33XXX_3,
+                                self._READ_OBS_33XXX_4, self._READ_OBS_33XXX_5]:
+                    response = await self._read_from_socket(read_cmd)
+                    data.update(self._map_response(response, self._sensors_obs_33xxx))
             except RequestRejectedException as ex:
                 if ex.message == ILLEGAL_DATA_ADDRESS:
                     logger.info("Observation 33xxx values not supported, disabling further attempts.")
@@ -1722,9 +1749,11 @@ class ET(Inverter):
 
         if self._observe_38xxx:
             try:
-                # Single read for entire 38000-38463 range
-                response = await self._read_from_socket(self._READ_OBS_38XXX)
-                data.update(self._map_response(response, self._sensors_obs_38xxx))
+                # Read 38xxx in 4 blocks (max 125 registers per read)
+                for read_cmd in [self._READ_OBS_38XXX_1, self._READ_OBS_38XXX_2, self._READ_OBS_38XXX_3,
+                                self._READ_OBS_38XXX_4]:
+                    response = await self._read_from_socket(read_cmd)
+                    data.update(self._map_response(response, self._sensors_obs_38xxx))
             except RequestRejectedException as ex:
                 if ex.message == ILLEGAL_DATA_ADDRESS:
                     logger.info("Observation 38xxx values not supported, disabling further attempts.")
@@ -1734,8 +1763,11 @@ class ET(Inverter):
 
         if self._observe_55xxx:
             try:
-                response = await self._read_from_socket(self._READ_OBS_55XXX)
-                data.update(self._map_response(response, self._sensors_obs_55xxx))
+                # Read 55xxx in 4 blocks (max 125 registers per read)
+                for read_cmd in [self._READ_OBS_55XXX_1, self._READ_OBS_55XXX_2, self._READ_OBS_55XXX_3,
+                                self._READ_OBS_55XXX_4]:
+                    response = await self._read_from_socket(read_cmd)
+                    data.update(self._map_response(response, self._sensors_obs_55xxx))
             except RequestRejectedException as ex:
                 if ex.message == ILLEGAL_DATA_ADDRESS:
                     logger.info("Observation 55xxx values not supported, disabling further attempts.")
