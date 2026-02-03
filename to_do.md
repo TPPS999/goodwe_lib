@@ -1,7 +1,7 @@
 # Plan działania - goodwe_lib
 
 **Data rozpoczęcia:** 2026-01-24 18:32
-**Ostatnia aktualizacja:** 2026-02-01 13:54
+**Ostatnia aktualizacja:** 2026-02-03 11:39
 
 ---
 
@@ -28,13 +28,14 @@
   - Usunięto udokumentowane zakresy (42xxx, 50xxx)
 
 ### Co jest w trakcie realizacji
-🎯 **v0.6.6 / v0.9.9.58 - Observation sensors z persystencją stanu**
+🎯 **v0.6.9 / v0.9.9.61 - Observation sensors z pełną persystencją** ✅ ZAKOŃCZONE
 - ✅ System parallel działa poprawnie
 - ✅ TypeError naprawiony
 - ✅ **Observation sensors switche z persystencją** (33xxx, 38xxx, 48xxx, 55xxx)
   - ✅ Switche zapisują swój stan do ConfigEntry.options
   - ✅ Po restarcie HA inverter przywraca flagi _observe_*xxx z zapisanych opcji
   - ✅ Sensory pojawiają się po restarcie jeśli switche były włączone
+  - ✅ **Auto-disable logic usunięta** - błędy Modbus nie nadpisują zapisanego stanu
   - ⚠️ **Wymaga restartu HA** po włączeniu/wyłączeniu switcha (to jest OK)
 
 ### Ostatnie zmiany (2026-01-31 12:30)
@@ -83,6 +84,58 @@
   - Znaleziono w produkcji: slot 1 używał mode 0xF9 (nieznany enum)
   - Dodano BATTERY_POWER_PERMILLAGE = 0xF9 do WorkWeekMode
   - Commit: 6498ae2 (v0.5.8), 0ea28f6 (custom component)
+
+### Bieżące działania (2026-02-03)
+🎯 **Reverse engineering rejestrów Modbus dla ustawień master i slave** 🚧 W TRAKCIE
+
+**Cel:** Znalezienie rejestrów Modbus odpowiadających za ustawienia invertera dla master i slave
+
+**Metoda:**
+- Porównanie scan logów przed i po zmianach ustawień
+- Analiza delt z multiplikatorami (x1, x10, x100, x1000)
+- Sprawdzanie wartości odwróconych (100-value encoding)
+- Wykluczenie pomiarów (47443, 47447, 47451)
+
+**Porównywane skany:**
+- Master OLD: scan_log_20260202_131128.txt (13:11) - 5217 rejestrów
+- Master NEW: scan_log_20260203_083328.txt (08:33) - 5219 rejestrów
+- Slave OLD: scan_log_20260202_160831.txt (16:08) - 579 rejestrów
+- Slave NEW: scan_log_20260202_190411.txt (19:04) - 579 rejestrów
+
+**Status MASTER (5 z 6 znalezionych):**
+- ✅ Peak Shaving SOC: **47593** (87 → 88, bezpośrednia %)
+- ✅ On Grid DOD: **45356** (34 → 32, encoding: 100-value, 66%→68%)
+- ✅ Charging Current: **45353** (490 → 480, encoding: value × 0.1A, 49.0A→48.0A)
+- ✅ Discharging Current: **45355** (520 → 510, encoding: value × 0.1A, 52.0A→51.0A)
+- ✅ SOC Upper Limit: **47760** (90 → 91, bezpośrednia %)
+- ❌ Peak Shaving Power: NIE ZNALEZIONY (delta +5.9kW)
+
+**Status SLAVE (kandydaci do weryfikacji):**
+- 🟡 Peak Shaving SOC: **48200** lub **48271** (oba +2, wymaga weryfikacji)
+- 🟡 On Grid DOD: **10435**, **10478**, lub **48199** (wszystkie -1, niejasne kodowanie)
+- 🟡 Charging Current: **45229** (1933 → 1953, +20, niejasne kodowanie)
+- 🟡 Discharging Current: **20009**, **10411**, lub **10472** (niejasne kodowanie)
+- 🟡 SOC Upper Limit: **48269** (23 → 28, +5, niejasne kodowanie)
+- ❌ Peak Shaving Power: NIE ZNALEZIONY (delta +4.9kW)
+
+**Kluczowe odkrycia:**
+1. Potwierdzono: ustawienia slave są przechowywane w pamięci mastera (slave ma tylko 0xxx i 55xxx)
+2. Rejestry slave prawdopodobnie w zakresach: 10xxx (parallel system) i 48xxx (slave battery)
+3. Master używa różnych enkodingów: bezpośrednie wartości, 0.1A multiplier, 100-value inversion
+4. Slave prawdopodobnie używa offsetów lub kombinowanych wartości
+
+**Pliki wygenerowane:**
+- docs/scripts/FOUND_REGISTERS_SUMMARY.md - szczegółowe podsumowanie wszystkich znalezisk
+- docs/scripts/search_slave_settings.py - skrypt wyszukiwania rejestrów slave
+- docs/scripts/compare_master_slave_deltas.py - porównanie delt master vs slave
+
+**Następne kroki:**
+1. Weryfikacja kandydatów slave przez małe testowe zmiany i reskan
+2. Znalezienie Peak Shaving Power dla master i slave
+3. Dekodowanie enkodingu absolutnych wartości dla rejestrów slave
+4. Testy zapisu do znalezionych rejestrów
+
+---
 
 ### Co jest do zrobienia
 
@@ -327,6 +380,59 @@ Wszystkie zasady pracy są opisane w [CLAUDE.md](CLAUDE.md):
 ---
 
 ## Historia zmian planu
+
+### 2026-02-03 11:39 - Reverse engineering: Znalezienie rejestrów Modbus dla master i slave
+- 🚧 **W TRAKCIE:** Analiza scan logów w celu znalezienia rejestrów odpowiadających za ustawienia
+- ✅ **Metoda:**
+  - Porównanie 4 scan logów (2 master, 2 slave) przed i po zmianach ustawień
+  - Analiza delt z multiplikatorami (x1, x10, x100, x1000)
+  - Sprawdzanie wartości odwróconych (100-value encoding)
+  - Wykluczenie rejestrów pomiarowych (47443, 47447, 47451)
+- ✅ **Master: Znaleziono 5 z 6 rejestrów:**
+  - 47593: Peak Shaving SOC (87 → 88)
+  - 45356: On Grid DOD (34 → 32, inverted: 66% → 68%)
+  - 45353: Charging Current (490 → 480, 0.1A: 49.0A → 48.0A)
+  - 45355: Discharging Current (520 → 510, 0.1A: 52.0A → 51.0A)
+  - 47760: SOC Upper Limit (90 → 91)
+  - ❌ Peak Shaving Power: nie znaleziony
+- 🟡 **Slave: Znaleziono kandydatów do weryfikacji:**
+  - Peak Shaving SOC: 48200 lub 48271 (oba +2)
+  - On Grid DOD: 10435, 10478, lub 48199 (wszystkie -1)
+  - Charging Current: 45229 (1933 → 1953, +20)
+  - Discharging Current: 20009, 10411, lub 10472
+  - SOC Upper Limit: 48269 (23 → 28, +5)
+  - ❌ Peak Shaving Power: nie znaleziony
+- 📝 **Kluczowe odkrycia:**
+  - Potwierdzono: ustawienia slave w pamięci mastera (zakresy 10xxx, 48xxx)
+  - Slave prawdopodobnie używa offsetów lub kombinowanych wartości
+  - Wymaga weryfikacji przez testowe zmiany i reskan
+- 📄 **Dokumentacja:** docs/scripts/FOUND_REGISTERS_SUMMARY.md
+- Backup: to_do/202602031139_to_do.md
+
+### 2026-02-02 14:15 - Fix: Remove auto-disable logic (v0.6.9 / v0.9.9.61)
+- ✅ **Problem:** Observation switches nadal traciły stan po niektórych błędach
+  - Auto-disable logic w et.py nadpisywała zapisane opcje ConfigEntry.options
+  - Przy błędzie ILLEGAL_DATA_ADDRESS kod ustawiał `self._observe_*xxx = False`
+  - To nadpisywało preferencje użytkownika zapisane w ConfigEntry.options
+- ✅ **Rozwiązanie:** Usunięcie auto-disable logic ze wszystkich observation ranges
+  - **et.py (v0.6.9):**
+    - Usunięto linię `self._observe_48xxx = False` z exception handlera
+    - Usunięto linię `self._observe_33xxx = False` z exception handlera
+    - Usunięto linię `self._observe_38xxx = False` z exception handlera
+    - Usunięto linię `self._observe_55xxx = False` z exception handlera
+    - Zmieniono logi z INFO na DEBUG poziom
+    - Dodano informację "will retry on next update" zamiast "disabling"
+  - **manifest.json (v0.9.9.61):**
+    - Aktualizacja wymagań: goodwe @ ...@v0.6.8 → v0.6.9
+- ✅ **Rezultat:** Observation switches teraz w pełni persistentne
+  - User preferences w ConfigEntry.options są zachowywane
+  - Błędy Modbus nie nadpisują zapisanego stanu
+  - Switch pozostaje włączony nawet przy błędach odczytu
+- ✅ Wersje:
+  - goodwe_lib: v0.6.9 (tag pushed)
+  - custom_components/goodwe: v0.9.9.61
+- ✅ Commit: 3f19fa7, acc7a5a
+- Backup: to_do/202602021415_to_do.md
 
 ### 2026-02-01 14:15 - Fix: Persistent state for observation switches (v0.9.9.58)
 - ✅ **Problem:** Switche observation sensors traciły swój stan po restarcie HA
