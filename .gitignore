@@ -131,6 +131,9 @@ dmypy.json
 # PyCharm
 .idea
 
+# Claude Code local settings
+.claude/settings.local.json
+
 # Project management files (local only)
 CLAUDE.md
 to_do.md
