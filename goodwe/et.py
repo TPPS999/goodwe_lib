@@ -455,6 +455,10 @@ class ET(Inverter):
         Integer("parallel_unknown_10497", 10497, "Parallel Unknown 10497", "", Kind.AC),
         Integer("parallel_unknown_10498", 10498, "Parallel Unknown 10498", "", Kind.AC),
         Integer("parallel_unknown_10499", 10499, "Parallel Unknown 10499", "", Kind.AC),
+        # Slave battery data (read from slave inverter in parallel systems)
+        Current("slave_battery_discharge_limit", 48011, "Slave Battery Discharge Current Limit", Kind.BAT),
+        Current("slave_battery_charge_limit", 48012, "Slave Battery Charge Current Limit", Kind.BAT),
+        Integer("slave_battery_soc", 48013, "Slave Battery SOC", "%", Kind.BAT),
     )
 
 
@@ -746,8 +750,7 @@ class ET(Inverter):
         self._READ_BATTERY2_INFO: ProtocolCommand = self._read_command(0x9858, 0x0016)
         self._READ_MPPT_DATA: ProtocolCommand = self._read_command(0x89e5, 0x3d)
         self._READ_PARALLEL_DATA: ProtocolCommand = self._read_command(0x28a0, 0x56)
-        # Observation registers for undocumented data
-        # Observation sensor commands - split into blocks (max 125 registers per read due to Modbus limitations)
+        self._READ_SLAVE_BATTERY: ProtocolCommand = self._read_command(48011, 3)  # Slave battery: discharge/charge limits + SOC
         # 48xxx range: 48000-48806 (807 regs total) - split into 7 blocks
         # 33xxx range: 33000-33501 (502 regs total) - split into 5 blocks
         # 38xxx range: 38000-38463 (464 regs total) - split into 4 blocks
@@ -1078,6 +1081,18 @@ class ET(Inverter):
                     self._has_parallel = False
                 else:
                     raise ex
+
+            # Read slave battery data (only for slave in parallel system)
+            # Registers 48011-48013: discharge/charge limits + SOC
+            if self._has_parallel:
+                try:
+                    response = await self._read_from_socket(self._READ_SLAVE_BATTERY)
+                    data.update(self._map_response(response, self._sensors_parallel))
+                except RequestRejectedException as ex:
+                    if ex.message == ILLEGAL_DATA_ADDRESS:
+                        logger.debug("Slave battery data not available (likely master inverter).")
+                    else:
+                        raise ex
 
         # Add inverter serial number as a constant sensor value
         data["serial_number"] = self.serial_number
