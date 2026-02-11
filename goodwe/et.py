@@ -66,20 +66,16 @@ class ET(Inverter):
         PowerS("pgrid3", 35135, "On-grid L3 Power", Kind.AC),
         Integer("grid_mode", 35136, "Grid Mode code", "", Kind.PV),
         Enum2("grid_mode_label", 35136, GRID_MODES, "Grid Mode", Kind.PV),
-        # 35137 reserved
-        PowerS("total_inverter_power", 35138, "Total Power", Kind.AC),
-        # 35139 reserved
-        PowerS("active_power", 35140, "Active Power", Kind.GRID),
+        Power4S("total_inverter_power", 35137, "Total Inverter Power", Kind.AC),
+        Power4S("active_power", 35139, "AC Active Power", Kind.GRID),
         Calculated("grid_in_out",
-                   lambda data: read_grid_mode(data, 35140),
+                   lambda data: read_grid_mode(data, 35139),
                    "On-grid Mode code", "", Kind.GRID),
         EnumCalculated("grid_in_out_label",
-                       lambda data: read_grid_mode(data, 35140), GRID_IN_OUT_MODES,
+                       lambda data: read_grid_mode(data, 35139), GRID_IN_OUT_MODES,
                        "On-grid Mode", Kind.GRID),
-        # 35141 reserved
-        Reactive("reactive_power", 35142, "Reactive Power", Kind.GRID),
-        # 35143 reserved
-        Apparent("apparent_power", 35144, "Apparent Power", Kind.GRID),
+        Reactive4("reactive_power", 35141, "AC Reactive Power", Kind.GRID),
+        Apparent4("apparent_power", 35143, "AC Apparent Power", Kind.GRID),
         Voltage("backup_v1", 35145, "Back-up L1 Voltage", Kind.UPS),
         Current("backup_i1", 35146, "Back-up L1 Current", Kind.UPS),
         Frequency("backup_f1", 35147, "Back-up L1 Frequency", Kind.UPS),
@@ -333,6 +329,9 @@ class ET(Inverter):
         Energy8("meter_e_total_imp_l2", 36112, "Meter Total Energy (import) L2", Kind.GRID),
         Energy8("meter_e_total_imp_l3", 36116, "Meter Total Energy (import) L3", Kind.GRID),
         Energy8("meter_e_total_imp_sum", 36120, "Meter Total Energy (import) Sum", Kind.GRID),
+        # Reactive Energy from meter (33xxx range)
+        Energy8("meter_e_reactive_total_sell", 33510, "Meter Total Reactive Energy (export)", Kind.GRID),
+        Energy8("meter_e_reactive_total_buy", 33514, "Meter Total Reactive Energy (import)", Kind.GRID),
     )
 
     # Inverter's MPPT data

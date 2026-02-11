@@ -228,7 +228,7 @@ class Apparent4(Sensor):
     """Sensor representing apparent power [VA] value encoded in 4 bytes"""
 
     def __init__(self, id_: str, offset: int, name: str, kind: Optional[SensorKind]):
-        super().__init__(id_, offset, name, 2, "VA", kind)
+        super().__init__(id_, offset, name, 4, "VA", kind)
 
     def read_value(self, data: ProtocolResponse):
         return read_bytes4_signed(data)
@@ -248,7 +248,7 @@ class Reactive4(Sensor):
     """Sensor representing reactive power [var] value encoded in 4 bytes"""
 
     def __init__(self, id_: str, offset: int, name: str, kind: Optional[SensorKind]):
-        super().__init__(id_, offset, name, 2, "var", kind)
+        super().__init__(id_, offset, name, 4, "var", kind)
 
     def read_value(self, data: ProtocolResponse):
         return read_bytes4_signed(data)
