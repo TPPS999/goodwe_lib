@@ -80,30 +80,22 @@ class ET(Inverter):
         Current("backup_i1", 35146, "Back-up L1 Current", Kind.UPS),
         Frequency("backup_f1", 35147, "Back-up L1 Frequency", Kind.UPS),
         Integer("load_mode1", 35148, "Load Mode L1"),
-        # 35149 reserved
-        PowerS("backup_p1", 35150, "Back-up L1 Power", Kind.UPS),
+        Power4S("backup_p1", 35149, "Back-up L1 Power", Kind.UPS),
         Voltage("backup_v2", 35151, "Back-up L2 Voltage", Kind.UPS),
         Current("backup_i2", 35152, "Back-up L2 Current", Kind.UPS),
         Frequency("backup_f2", 35153, "Back-up L2 Frequency", Kind.UPS),
         Integer("load_mode2", 35154, "Load Mode L2"),
-        # 35155 reserved
-        PowerS("backup_p2", 35156, "Back-up L2 Power", Kind.UPS),
+        Power4S("backup_p2", 35155, "Back-up L2 Power", Kind.UPS),
         Voltage("backup_v3", 35157, "Back-up L3 Voltage", Kind.UPS),
         Current("backup_i3", 35158, "Back-up L3 Current", Kind.UPS),
         Frequency("backup_f3", 35159, "Back-up L3 Frequency", Kind.UPS),
         Integer("load_mode3", 35160, "Load Mode L3"),
-        # 35161 reserved
-        PowerS("backup_p3", 35162, "Back-up L3 Power", Kind.UPS),
-        # 35163 reserved
-        PowerS("load_p1", 35164, "Load L1", Kind.AC),
-        # 35165 reserved
-        PowerS("load_p2", 35166, "Load L2", Kind.AC),
-        # 35167 reserved
-        PowerS("load_p3", 35168, "Load L3", Kind.AC),
-        # 35169 reserved
-        PowerS("backup_ptotal", 35170, "Back-up Load", Kind.UPS),
-        # 35171 reserved
-        PowerS("load_ptotal", 35172, "Load", Kind.AC),
+        Power4S("backup_p3", 35161, "Back-up L3 Power", Kind.UPS),
+        Power4S("load_p1", 35163, "On-grid Load L1 Power", Kind.AC),
+        Power4S("load_p2", 35165, "On-grid Load L2 Power", Kind.AC),
+        Power4S("load_p3", 35167, "On-grid Load L3 Power", Kind.AC),
+        Power4S("backup_ptotal", 35169, "Total Back-Up Load Power", Kind.UPS),
+        Power4S("load_ptotal", 35171, "Total Load Power", Kind.AC),
         Integer("ups_load", 35173, "Ups Load", "%", Kind.UPS),
         Temp("temperature_air", 35174, "Inverter Temperature (Air)", Kind.AC),
         Temp("temperature_module", 35175, "Inverter Temperature (Module)"),
@@ -147,7 +139,7 @@ class ET(Inverter):
                    read_bytes4(data, 35113, 0) +
                    read_bytes4(data, 35117, 0) +
                    read_bytes4_signed(data, 35182) -
-                   read_bytes2_signed(data, 35140),
+                   read_bytes4_signed(data, 35139),
                    "House Consumption", "W", Kind.AC),
 
         # TOU (Time of Use) Slots 1-8
