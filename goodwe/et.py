@@ -266,6 +266,40 @@ class ET(Inverter):
         # String8("battery2_sn", 39058, "Battery 2 S/N", Kind.BAT),
     )
 
+    # Modbus registers from offset 0x898C (35228), count 0x27 (39)
+    # Extended backup per-phase load data + Battery2 basic runtime (new in 2025 firmware)
+    __all_sensors_backup_extended: tuple[Sensor, ...] = (
+        # R Phase Back-Up load measurements (35228-35233)
+        Voltage("backup_v1_ext", 35228, "Back-Up R Phase Load Voltage", Kind.UPS),
+        Current("backup_i1_ext", 35229, "Back-Up R Phase Load Current", Kind.UPS),
+        Frequency("backup_f1_ext", 35230, "Back-Up R Phase Load Frequency", Kind.UPS),
+        Integer("backup_mode1_ext", 35231, "Back-Up R Phase Load Mode", "", Kind.UPS),
+        Power4S("backup_p1_ext", 35232, "Back-Up R Phase Load Power", Kind.UPS),
+        # S Phase Back-Up load measurements (35234-35239)
+        Voltage("backup_v2_ext", 35234, "Back-Up S Phase Load Voltage", Kind.UPS),
+        Current("backup_i2_ext", 35235, "Back-Up S Phase Load Current", Kind.UPS),
+        Frequency("backup_f2_ext", 35236, "Back-Up S Phase Load Frequency", Kind.UPS),
+        Integer("backup_mode2_ext", 35237, "Back-Up S Phase Load Mode", "", Kind.UPS),
+        Power4S("backup_p2_ext", 35238, "Back-Up S Phase Load Power", Kind.UPS),
+        # T Phase Back-Up load measurements (35240-35245)
+        Voltage("backup_v3_ext", 35240, "Back-Up T Phase Load Voltage", Kind.UPS),
+        Current("backup_i3_ext", 35241, "Back-Up T Phase Load Current", Kind.UPS),
+        Frequency("backup_f3_ext", 35242, "Back-Up T Phase Load Frequency", Kind.UPS),
+        Integer("backup_mode3_ext", 35243, "Back-Up T Phase Load Mode", "", Kind.UPS),
+        Power4S("backup_p3_ext", 35244, "Back-Up T Phase Load Power", Kind.UPS),
+        # Total Back-Up load (35246-35247)
+        Power4S("backup_ptotal_ext", 35246, "Total Back-Up Load Power Avg", Kind.UPS),
+    )
+
+    # Battery 2 basic runtime sensors (same read block as backup_extended: 35228-35266)
+    __all_sensors_battery2_basic: tuple[Sensor, ...] = (
+        Voltage("vbattery2", 35262, "Battery 2 Voltage", Kind.BAT),
+        CurrentS("ibattery2", 35263, "Battery 2 Current", Kind.BAT),
+        Power4S("pbattery2", 35264, "Battery 2 Power", Kind.BAT),
+        Integer("battery2_mode", 35266, "Battery 2 Mode code", "", Kind.BAT),
+        Enum2("battery2_mode_label", 35266, BATTERY_MODES, "Battery 2 Mode", Kind.BAT),
+    )
+
     # Inverter's meter data
     # Modbus registers from offset 0x8ca0 (36000)
     __all_sensors_meter: tuple[Sensor, ...] = (
@@ -726,6 +760,21 @@ class ET(Inverter):
         Integer("eco_mode_enable", 47612, "Eco Mode Switch"),
     )
 
+    # New feature settings available in 2025 firmware (ARM fw >= 25 approx.)
+    # Anti-backflow, LG VPP Control, AC active limit
+    __settings_new_features: tuple[Sensor, ...] = (
+        # Anti-backflow function (46708)
+        Integer("anti_backflow_function", 46708, "Anti-Backflow Function", "", Kind.GRID),
+        # LG VPP (Virtual Power Plant) Control (47775-47782)
+        Integer("lg_vpp_enable", 47775, "LG VPP Control Enable", "", Kind.BAT),
+        Long("lg_vpp_start_time", 47776, "LG VPP Start Time", "s", Kind.BAT),
+        Long("lg_vpp_end_time", 47778, "LG VPP End Time", "s", Kind.BAT),
+        Integer("lg_vpp_battery_mode", 47780, "LG VPP Battery Mode", "", Kind.BAT),
+        LongS("lg_vpp_battery_power", 47781, "LG VPP Battery Power", "W", Kind.BAT),
+        # AC active current limit flag (48028)
+        Integer("ac_active_limit_flag", 48028, "AC Active Limit Flag", "", Kind.AC),
+    )
+
     def __init__(self, host: str, port: int, comm_addr: int = 0, timeout: int = 1, retries: int = 3):
         super().__init__(host, port, comm_addr if comm_addr else 0xf7, timeout, retries)
         self._READ_DEVICE_VERSION_INFO: ProtocolCommand = self._read_command(0x88b8, 0x0021)
@@ -737,6 +786,8 @@ class ET(Inverter):
         self._READ_BATTERY2_INFO: ProtocolCommand = self._read_command(0x9858, 0x0016)
         self._READ_MPPT_DATA: ProtocolCommand = self._read_command(0x89e5, 0x3d)
         self._READ_PARALLEL_DATA: ProtocolCommand = self._read_command(0x28a0, 0x56)
+        # Extended backup per-phase + Battery2 basic runtime data (35228-35266)
+        self._READ_BACKUP_EXTENDED_DATA: ProtocolCommand = self._read_command(0x898C, 0x27)
         # Observation registers for undocumented data
         # Observation sensor commands - split into blocks (max 125 registers per read due to Modbus limitations)
         # 48xxx range: 48000-48806 (807 regs total) - split into 7 blocks
@@ -752,13 +803,15 @@ class ET(Inverter):
         self._has_meter_extended2: bool = False
         self._has_mppt: bool = False
         self._has_parallel: bool = False
-        # Observation sensors for undocumented registers (disabled by default)
-        # Set to True to enable observation of these registers for debugging/research
+        self._has_backup_extended: bool = True
+        self._has_new_features: bool = False
         # Parallel system topology detection (auto-detected on first ILLEGAL_DATA_ADDRESS)
         self._parallel_topology: str = "standalone"  # "standalone", "master_in_parallel", "slave_in_parallel"
         self._sensors = self.__all_sensors
         self._sensors_battery = self.__all_sensors_battery
         self._sensors_battery2 = self.__all_sensors_battery2
+        self._sensors_battery2_basic = self.__all_sensors_battery2_basic
+        self._sensors_backup_extended = self.__all_sensors_backup_extended
         self._sensors_meter = self.__all_sensors_meter
         self._sensors_mppt = self.__all_sensors_mppt
         self._sensors_parallel = self.__all_sensors_parallel
@@ -896,6 +949,18 @@ class ET(Inverter):
             logger.debug("Cannot read _has_peak_shaving settings, disabling it.")
             self._has_peak_shaving = False
 
+        # Check and add new feature settings (anti-backflow 46708, LG VPP 47775, AC limit 48028)
+        try:
+            await self._read_from_socket(self._read_command(46708, 1))
+            self._settings.update({s.id_: s for s in self.__settings_new_features})
+            self._has_new_features = True
+            logger.debug("New feature settings (anti-backflow, LG VPP, AC limit) supported.")
+        except RequestRejectedException as ex:
+            if ex.message == ILLEGAL_DATA_ADDRESS:
+                logger.debug("New feature settings not supported (anti-backflow, LG VPP, AC limit).")
+        except RequestFailedException:
+            logger.debug("Cannot read new feature settings.")
+
         # Detect parallel system topology by reading register 10400 (Inverter Quantity)
         # This register tells us the system configuration:
         # - 1: Standalone inverter (no parallel system)
@@ -966,6 +1031,19 @@ class ET(Inverter):
                 if ex.message == ILLEGAL_DATA_ADDRESS:
                     logger.info("Battery 2 values not supported, disabling further attempts.")
                     self._has_battery2 = False
+                else:
+                    raise ex
+
+        if self._has_backup_extended:
+            try:
+                response = await self._read_from_socket(self._READ_BACKUP_EXTENDED_DATA)
+                data.update(self._map_response(response, self._sensors_backup_extended))
+                if self._has_battery2:
+                    data.update(self._map_response(response, self._sensors_battery2_basic))
+            except RequestRejectedException as ex:
+                if ex.message == ILLEGAL_DATA_ADDRESS:
+                    logger.info("Backup extended data not supported, disabling further attempts.")
+                    self._has_backup_extended = False
                 else:
                     raise ex
 
@@ -1278,6 +1356,13 @@ class ET(Inverter):
             result = result + self._sensors_battery
         if self._has_battery2 and self._parallel_topology != "slave_in_parallel":
             result = result + self._sensors_battery2
+
+        # Extended backup per-phase sensors (35228-35247) - 2025 firmware
+        if self._has_backup_extended:
+            result = result + self._sensors_backup_extended
+            # Battery 2 basic runtime (35262-35266) - only if dual battery
+            if self._has_battery2:
+                result = result + self._sensors_battery2_basic
 
         # MPPT sensors - available on all topologies
         if self._has_mppt:
