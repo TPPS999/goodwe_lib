@@ -775,6 +775,41 @@ class ET(Inverter):
         Integer("ac_active_limit_flag", 48028, "AC Active Limit Flag", "", Kind.AC),
     )
 
+    # Negative Electric Price Plan registers (47785-47812)
+    # Available in 2025 firmware. Probe at 47785 to detect support.
+    # 96-bit bitmask per plan: 6 registers x 16 bits = 96 x 15-min slots = 24h
+    # Bit=1 means negative/favorable price in that 15-min slot.
+    __settings_neg_price: tuple[Sensor, ...] = (
+        Integer("neg_price_enable", 47785, "Negative Electric Price Plan Enable", "", Kind.GRID),
+        Integer("neg_price_rtc_today", 47786, "Negative Price RTC Today", "", Kind.GRID),
+        Integer("neg_price_sell_today_1", 47787, "Neg Price Sell Today Mask 1", "", Kind.GRID),
+        Integer("neg_price_sell_today_2", 47788, "Neg Price Sell Today Mask 2", "", Kind.GRID),
+        Integer("neg_price_sell_today_3", 47789, "Neg Price Sell Today Mask 3", "", Kind.GRID),
+        Integer("neg_price_sell_today_4", 47790, "Neg Price Sell Today Mask 4", "", Kind.GRID),
+        Integer("neg_price_sell_today_5", 47791, "Neg Price Sell Today Mask 5", "", Kind.GRID),
+        Integer("neg_price_sell_today_6", 47792, "Neg Price Sell Today Mask 6", "", Kind.GRID),
+        Integer("neg_price_rtc_tomorrow", 47793, "Negative Price RTC Tomorrow", "", Kind.GRID),
+        Integer("neg_price_sell_tomorrow_1", 47794, "Neg Price Sell Tomorrow Mask 1", "", Kind.GRID),
+        Integer("neg_price_sell_tomorrow_2", 47795, "Neg Price Sell Tomorrow Mask 2", "", Kind.GRID),
+        Integer("neg_price_sell_tomorrow_3", 47796, "Neg Price Sell Tomorrow Mask 3", "", Kind.GRID),
+        Integer("neg_price_sell_tomorrow_4", 47797, "Neg Price Sell Tomorrow Mask 4", "", Kind.GRID),
+        Integer("neg_price_sell_tomorrow_5", 47798, "Neg Price Sell Tomorrow Mask 5", "", Kind.GRID),
+        Integer("neg_price_sell_tomorrow_6", 47799, "Neg Price Sell Tomorrow Mask 6", "", Kind.GRID),
+        Integer("neg_price_buy_switch", 47800, "Negative Price Buy Switch", "", Kind.GRID),
+        Integer("neg_price_buy_today_1", 47801, "Neg Price Buy Today Mask 1", "", Kind.GRID),
+        Integer("neg_price_buy_today_2", 47802, "Neg Price Buy Today Mask 2", "", Kind.GRID),
+        Integer("neg_price_buy_today_3", 47803, "Neg Price Buy Today Mask 3", "", Kind.GRID),
+        Integer("neg_price_buy_today_4", 47804, "Neg Price Buy Today Mask 4", "", Kind.GRID),
+        Integer("neg_price_buy_today_5", 47805, "Neg Price Buy Today Mask 5", "", Kind.GRID),
+        Integer("neg_price_buy_today_6", 47806, "Neg Price Buy Today Mask 6", "", Kind.GRID),
+        Integer("neg_price_buy_tomorrow_1", 47807, "Neg Price Buy Tomorrow Mask 1", "", Kind.GRID),
+        Integer("neg_price_buy_tomorrow_2", 47808, "Neg Price Buy Tomorrow Mask 2", "", Kind.GRID),
+        Integer("neg_price_buy_tomorrow_3", 47809, "Neg Price Buy Tomorrow Mask 3", "", Kind.GRID),
+        Integer("neg_price_buy_tomorrow_4", 47810, "Neg Price Buy Tomorrow Mask 4", "", Kind.GRID),
+        Integer("neg_price_buy_tomorrow_5", 47811, "Neg Price Buy Tomorrow Mask 5", "", Kind.GRID),
+        Integer("neg_price_buy_tomorrow_6", 47812, "Neg Price Buy Tomorrow Mask 6", "", Kind.GRID),
+    )
+
     def __init__(self, host: str, port: int, comm_addr: int = 0, timeout: int = 1, retries: int = 3):
         super().__init__(host, port, comm_addr if comm_addr else 0xf7, timeout, retries)
         self._READ_DEVICE_VERSION_INFO: ProtocolCommand = self._read_command(0x88b8, 0x0021)
@@ -805,6 +840,7 @@ class ET(Inverter):
         self._has_parallel: bool = False
         self._has_backup_extended: bool = True
         self._has_new_features: bool = False
+        self._has_neg_price: bool = False
         # Parallel system topology detection (auto-detected on first ILLEGAL_DATA_ADDRESS)
         self._parallel_topology: str = "standalone"  # "standalone", "master_in_parallel", "slave_in_parallel"
         self._sensors = self.__all_sensors
@@ -960,6 +996,18 @@ class ET(Inverter):
                 logger.debug("New feature settings not supported (anti-backflow, LG VPP, AC limit).")
         except RequestFailedException:
             logger.debug("Cannot read new feature settings.")
+
+        # Check and add negative electric price plan settings (47785-47812)
+        try:
+            await self._read_from_socket(self._read_command(47785, 1))
+            self._settings.update({s.id_: s for s in self.__settings_neg_price})
+            self._has_neg_price = True
+            logger.debug("Negative electric price plan settings (47785-47812) supported.")
+        except RequestRejectedException as ex:
+            if ex.message == ILLEGAL_DATA_ADDRESS:
+                logger.debug("Negative electric price plan settings not supported.")
+        except RequestFailedException:
+            logger.debug("Cannot read negative electric price plan settings.")
 
         # Detect parallel system topology by reading register 10400 (Inverter Quantity)
         # This register tells us the system configuration:

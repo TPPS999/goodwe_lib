@@ -1,7 +1,7 @@
 # Plan działania - goodwe_lib
 
 **Data rozpoczęcia:** 2026-01-24 18:32
-**Ostatnia aktualizacja:** 2026-02-03 11:39
+**Ostatnia aktualizacja:** 2026-02-19 19:09
 
 ---
 
@@ -85,8 +85,29 @@
   - Dodano BATTERY_POWER_PERMILLAGE = 0xF9 do WorkWeekMode
   - Commit: 6498ae2 (v0.5.8), 0ea28f6 (custom component)
 
-### Bieżące działania (2026-02-03)
-🎯 **Reverse engineering rejestrów Modbus dla ustawień master i slave** 🚧 W TRAKCIE
+### Bieżące działania (2026-02-19)
+
+🎯 **Fix: Numbers TOU nie aktualizują wartości + skalowanie peak shaving power** 🚧 W TRAKCIE
+
+**Problem 1: Numbers nie odświeżają wartości z falownika**
+- Numbers wysyłają wartości poprawnie (write działa)
+- Ale nie odczytują aktualnej wartości z falownika (brak read-back)
+- Pokazują wartość którą użytkownik wpisał, nie rzeczywistą z falownika
+- Cel: każdy Number powinien po zapisie i periodycznie odczytywać swój rejestr
+
+**Problem 2: Peak Shaving Power - błędne skalowanie**
+- Falownik przechowuje w jednostkach 10W (3800 = 38000W = 38kW)
+- Trzeba dostosować skalowanie w number entity
+
+**Plan:**
+1. Zbadać number.py i switch.py - jak działa periodic read / response
+2. Sprawdzić czy Numbers mają async_update / coordinator refresh
+3. Naprawić skalowanie peak_shaving_power
+
+---
+
+### Poprzednie działania (2026-02-03)
+🎯 **Reverse engineering rejestrów Modbus dla ustawień master i slave** - ZAWIESZONE
 
 **Cel:** Znalezienie rejestrów Modbus odpowiadających za ustawienia invertera dla master i slave
 
@@ -138,6 +159,12 @@
 ---
 
 ### Co jest do zrobienia
+
+#### X. Fix Numbers TOU + peak shaving scaling 🚧 W TRAKCIE
+- 🚧 Analiza number.py i switch.py
+- 🚧 Fix: Numbers nie aktualizują wartości z falownika (brak read-back)
+- 🚧 Fix: peak_shaving_power skalowanie (x10, jednostki 10W)
+- Context: 202602191909_context.md
 
 #### 0. Dopracowanie observation sensors - **ZAKOŃCZONE** ✅
 **Status:** ✅ ZAKOŃCZONE
