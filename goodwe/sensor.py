@@ -362,9 +362,23 @@ class SwitchValue(Sensor):
         self._off_value = off_value
 
     def read_value(self, data: ProtocolResponse) -> int:
-        """Read register and return 1 if matches on_value, 0 otherwise."""
+        """Read register and return 1 if matches on_value, 0 otherwise.
+
+        For WorkWeekV2 registers (like peak_shaving_enabled at 47591), compare only
+        the high byte (mode) instead of the full 16-bit value, since the low byte
+        contains day bitmask which varies independently of the on/off state.
+        """
         raw = read_bytes2(data)
-        return 1 if raw == self._on_value else 0
+        # If on_value and off_value differ only in high byte (low byte is 0x00),
+        # compare only high bytes to ignore day bitmask variations
+        if (self._on_value & 0xFF) == 0 and (self._off_value & 0xFF) == 0:
+            # WorkWeekV2 mode: compare only high byte (mode)
+            raw_mode = raw >> 8
+            on_mode = self._on_value >> 8
+            return 1 if raw_mode == on_mode else 0
+        else:
+            # Regular switch: compare full value
+            return 1 if raw == self._on_value else 0
 
     def encode_value(self, value: Any, register_value: bytes = None) -> bytes:
         """Encode boolean/int to custom on/off value."""

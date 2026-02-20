@@ -870,6 +870,15 @@ class ET(Inverter):
         return s.offset < 36058
 
     @staticmethod
+    def _not_reactive_energy(s: Sensor) -> bool:
+        """Filter to exclude reactive energy sensors (33xxx range).
+
+        These sensors are defined but not currently read (no 33xxx read command).
+        Registers 33510, 33514 are outside the meter data read range (36000-36125).
+        """
+        return s.offset not in (33510, 33514)
+
+    @staticmethod
     def _not_slave_only_restricted(s: Sensor) -> bool:
         """Filter to exclude registers that SLAVE inverters in parallel systems cannot access.
 
@@ -960,6 +969,9 @@ class ET(Inverter):
             self._has_meter_extended2 = True
         else:
             self._sensors_meter = tuple(filter(self._not_extended_meter, self._sensors_meter))
+
+        # Filter out reactive energy sensors (33xxx range) - no read command for this range yet
+        self._sensors_meter = tuple(filter(self._not_reactive_energy, self._sensors_meter))
 
         # Check and add EcoModeV2 settings added in (ETU fw 19)
         try:
