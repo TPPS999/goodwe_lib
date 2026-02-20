@@ -1243,7 +1243,8 @@ class ET(Inverter):
         except RequestRejectedException as ex:
             if ex.message == ILLEGAL_DATA_ADDRESS:
                 logger.debug("Unsupported sensor/setting %s", sensor.id_)
-                self._settings.pop(sensor.id_, None)
+                # Don't permanently remove settings - transient errors shouldn't disable features
+                # Settings are filtered during initialization based on firmware/model detection
                 raise ValueError(f'Unknown sensor/setting "{sensor.id_}"')
             return None
 
