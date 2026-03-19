@@ -24,8 +24,9 @@ from .dt import DT
 from .es import ES
 from .et import ET
 from .exceptions import InverterError, RequestFailedException
+from .hca import HCA
 from .inverter import Inverter, OperationMode, Sensor, SensorKind
-from .model import DT_MODEL_TAGS, ES_MODEL_TAGS, ET_MODEL_TAGS
+from .model import DT_MODEL_TAGS, ES_MODEL_TAGS, ET_MODEL_TAGS, HCA_MODEL_TAGS
 from .protocol import ProtocolCommand, UdpInverterProtocol, Aa55ProtocolCommand
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ logger = logging.getLogger(__name__)
 ET_FAMILY = ["ET", "EH", "BT", "BH"]
 ES_FAMILY = ["ES", "EM", "BP"]
 DT_FAMILY = ["DT", "MS", "NS", "XS"]
+HCA_FAMILY = ["HCA"]
 
 # Initial discovery command
 DISCOVERY_COMMAND = Aa55ProtocolCommand("010200", "0182")
@@ -60,6 +62,8 @@ async def connect(host: str, port: int = GOODWE_UDP_PORT, family: str = None, co
         inv = ES(host, port, comm_addr, timeout, retries)
     elif family in DT_FAMILY:
         inv = DT(host, port, comm_addr, timeout, retries)
+    elif family in HCA_FAMILY:
+        inv = HCA(host, port, comm_addr, timeout, retries)
     elif do_discover:
         return await discover(host, port, timeout, retries)
     else:
@@ -104,6 +108,12 @@ async def discover(host: str, port: int = GOODWE_UDP_PORT, timeout: int = 1, ret
                     if model_tag in serial_number:
                         logger.debug("Detected DT/MS/D-NS/XS/GEP inverter %s, S/N:%s.", model_name, serial_number)
                         i = DT(host, port, 0, timeout, retries)
+                        break
+            if not i:
+                for model_tag in HCA_MODEL_TAGS:
+                    if model_tag in serial_number:
+                        logger.debug("Detected HCA EV charger %s, S/N:%s.", model_name, serial_number)
+                        i = HCA(host, port, 0, timeout, retries)
                         break
             if i:
                 await i.read_device_info()

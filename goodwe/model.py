@@ -8,6 +8,8 @@ PLATFORM_745_HV_MODELS = ("ETT", "HTA", "HUB", "AEB", "SPB", "CUB", "EUB", "HEB"
                           "EBR")
 PLATFORM_753_MODELS = ("AES", "HHI", "ABP", "EHB", "HSB", "HUA", "CUA")
 
+HCA_MODEL_TAGS = ("HPA",)  # HCA/HCA G2 EV charger - HPA tag in serial number
+
 ET_MODEL_TAGS = PLATFORM_205_MODELS + PLATFORM_745_LV_MODELS + PLATFORM_745_HV_MODELS + PLATFORM_753_MODELS + (
     "ETC", "BTC", "BTN",  # Qianhai
     "40KET", "50KET",  # High power ET models
