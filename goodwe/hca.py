@@ -196,6 +196,13 @@ class HCA(Inverter):
     async def set_ongrid_battery_dod(self, dod: int) -> None:
         raise InverterError("Not supported by HCA EV charger")
 
+    @property
+    def sensor_name_prefix(self) -> str:
+        """Generate entity ID prefix based on last 4 characters of serial number."""
+        if self.serial_number and len(self.serial_number) >= 4:
+            return f"GW{self.serial_number[-4:]}_"
+        return ""
+
     def sensors(self) -> tuple[Sensor, ...]:
         return self._sensors
 
