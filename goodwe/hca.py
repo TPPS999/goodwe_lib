@@ -2,14 +2,15 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from .const import GOODWE_TCP_PORT
 from .exceptions import InverterError, RequestFailedException
 from .inverter import Inverter, OperationMode, Sensor, SensorKind as Kind
-from .protocol import ProtocolCommand
+from .protocol import ProtocolCommand, ProtocolResponse
 from .sensor import (
     Current, Decimal, Energy4, Enum2, Integer, Long, SwitchValue, Voltage,
+    read_bytes2,
 )
 
 logger = logging.getLogger(__name__)
@@ -20,13 +21,13 @@ CHARGER_STATUS_MODES: dict[int, str] = {
     1: "Idle (plugged)",
     2: "Handshaking",
     3: "Charging",
-    4: "Complete",
+    4: "Charging complete",
     5: "Alarm",
     6: "Scheduled",
     7: "Maintenance",
     8: "Start failed",
     9: "Upgrading",
-    10: "Interrupted",
+    10: "Interrupted (low PV/bat)",
 }
 
 CAR_CONNECTION_MODES: dict[int, str] = {
@@ -35,10 +36,10 @@ CAR_CONNECTION_MODES: dict[int, str] = {
     2: "Connected",
 }
 
-CHARGE_MODE_MODES: dict[int, str] = {
-    0: "Fast",
-    1: "PV Only",
-    2: "PV + Battery",
+CHARGING_MODE_MODES: dict[int, str] = {
+    0: "Fast charge",
+    1: "PV only",
+    2: "PV + battery",
 }
 
 CHARGE_START_MODES: dict[int, str] = {
@@ -52,6 +53,35 @@ CHARGE_START_MODES: dict[int, str] = {
     7: "Bluetooth app",
 }
 
+CHARGING_STRATEGY_MODES: dict[int, str] = {
+    0: "Auto (full)",
+    1: "By time",
+    2: "By amount",
+    3: "By energy",
+}
+
+
+class PowerSourceSensor(Sensor):
+    """Sensor representing charging power source as human-readable text.
+
+    Register 10108 is a bitmask: bit0=grid, bit1=PV, bit2=battery.
+    Returns comma-separated list of active sources, e.g. 'Grid, PV'.
+    """
+
+    def __init__(self, id_: str, offset: int, name: str, kind: Optional[Kind] = None):
+        super().__init__(id_, offset, name, 2, "", kind)
+
+    def read_value(self, data: ProtocolResponse) -> str:
+        raw = read_bytes2(data)
+        sources = []
+        if raw & 0x01:
+            sources.append("Grid")
+        if raw & 0x02:
+            sources.append("PV")
+        if raw & 0x04:
+            sources.append("Battery")
+        return ", ".join(sources) if sources else "None"
+
 
 class HCA(Inverter):
     """Class representing GoodWe HCA G2 EV charger series.
@@ -63,62 +93,71 @@ class HCA(Inverter):
 
     # Runtime block 1 sensors - 3-phase (registers 10000-10018)
     __sensors_block1_3phase: tuple[Sensor, ...] = (
-        Integer("ac_fault_01", 10001, "AC Fault Bytes 01", "", Kind.AC),
-        Integer("ac_fault_02", 10002, "AC Fault Bytes 02", "", Kind.AC),
-        Integer("ac_fault_03", 10003, "AC Fault Bytes 03", "", Kind.AC),
-        Integer("ac_fault_04", 10004, "AC Fault Bytes 04", "", Kind.AC),
-        Integer("ac_alarm_05", 10005, "AC Alarm Bytes 05", "", Kind.AC),
-        Integer("ac_alarm_06", 10006, "AC Alarm Bytes 06", "", Kind.AC),
-        Integer("hw_fault_07", 10007, "HW Fault Bytes 07", "", Kind.AC),
-        Integer("hw_fault_08", 10008, "HW Fault Bytes 08", "", Kind.AC),
-        Voltage("voltage_a", 10009, "A Phase Voltage", Kind.AC),
-        Voltage("voltage_b", 10010, "B Phase Voltage", Kind.AC),
-        Voltage("voltage_c", 10011, "C Phase Voltage", Kind.AC),
-        Current("current_a", 10012, "A Phase Current", Kind.AC),
-        Current("current_b", 10013, "B Phase Current", Kind.AC),
-        Current("current_c", 10014, "C Phase Current", Kind.AC),
-        Decimal("charging_power", 10015, 10, "Charging Power", "kW", Kind.AC),
-        Decimal("session_energy", 10016, 10, "Current Session Energy", "kWh", Kind.AC),
-        Enum2("charger_status", 10017, CHARGER_STATUS_MODES, "Station Status", Kind.AC),
-        Integer("comm_status", 10018, "Communication Status", "", Kind.AC),
+        # Fault/alarm status registers (bitmasks - non-zero means fault active)
+        Integer("ac_fault_01", 10001, "EV Charger AC Fault 1", "", Kind.AC),
+        Integer("ac_fault_02", 10002, "EV Charger AC Fault 2", "", Kind.AC),
+        Integer("ac_fault_03", 10003, "EV Charger AC Fault 3", "", Kind.AC),
+        Integer("ac_fault_04", 10004, "EV Charger AC Fault 4", "", Kind.AC),
+        Integer("ac_alarm_05", 10005, "EV Charger AC Alarm 1", "", Kind.AC),
+        Integer("ac_alarm_06", 10006, "EV Charger AC Alarm 2", "", Kind.AC),
+        Integer("hw_fault_07", 10007, "EV Charger HW Fault 1", "", Kind.AC),
+        Integer("hw_fault_08", 10008, "EV Charger HW Fault 2", "", Kind.AC),
+        # AC measurements
+        Voltage("voltage_a", 10009, "Charge Voltage L1", Kind.AC),
+        Voltage("voltage_b", 10010, "Charge Voltage L2", Kind.AC),
+        Voltage("voltage_c", 10011, "Charge Voltage L3", Kind.AC),
+        Current("current_a", 10012, "Charge Current L1", Kind.AC),
+        Current("current_b", 10013, "Charge Current L2", Kind.AC),
+        Current("current_c", 10014, "Charge Current L3", Kind.AC),
+        # Power and energy
+        Decimal("charging_power", 10015, 10, "EV Charge Power", "kW", Kind.AC),
+        Decimal("session_energy", 10016, 10, "Session Energy", "kWh", Kind.AC),
+        # Status
+        Enum2("charger_status", 10017, CHARGER_STATUS_MODES, "Charger Status", Kind.AC),
+        Integer("charger_status_code", 10017, "Charger Status Code", "", Kind.AC),
+        Integer("comm_status", 10018, "Connection Status Bits", "", Kind.AC),
     )
 
     # Runtime block 1 sensors - single-phase (B/C phase sensors excluded)
     __sensors_block1_1phase: tuple[Sensor, ...] = (
-        Integer("ac_fault_01", 10001, "AC Fault Bytes 01", "", Kind.AC),
-        Integer("ac_fault_02", 10002, "AC Fault Bytes 02", "", Kind.AC),
-        Integer("ac_fault_03", 10003, "AC Fault Bytes 03", "", Kind.AC),
-        Integer("ac_fault_04", 10004, "AC Fault Bytes 04", "", Kind.AC),
-        Integer("ac_alarm_05", 10005, "AC Alarm Bytes 05", "", Kind.AC),
-        Integer("ac_alarm_06", 10006, "AC Alarm Bytes 06", "", Kind.AC),
-        Integer("hw_fault_07", 10007, "HW Fault Bytes 07", "", Kind.AC),
-        Integer("hw_fault_08", 10008, "HW Fault Bytes 08", "", Kind.AC),
-        Voltage("voltage_a", 10009, "A Phase Voltage", Kind.AC),
-        Current("current_a", 10012, "A Phase Current", Kind.AC),
-        Decimal("charging_power", 10015, 10, "Charging Power", "kW", Kind.AC),
-        Decimal("session_energy", 10016, 10, "Current Session Energy", "kWh", Kind.AC),
-        Enum2("charger_status", 10017, CHARGER_STATUS_MODES, "Station Status", Kind.AC),
-        Integer("comm_status", 10018, "Communication Status", "", Kind.AC),
+        Integer("ac_fault_01", 10001, "EV Charger AC Fault 1", "", Kind.AC),
+        Integer("ac_fault_02", 10002, "EV Charger AC Fault 2", "", Kind.AC),
+        Integer("ac_fault_03", 10003, "EV Charger AC Fault 3", "", Kind.AC),
+        Integer("ac_fault_04", 10004, "EV Charger AC Fault 4", "", Kind.AC),
+        Integer("ac_alarm_05", 10005, "EV Charger AC Alarm 1", "", Kind.AC),
+        Integer("ac_alarm_06", 10006, "EV Charger AC Alarm 2", "", Kind.AC),
+        Integer("hw_fault_07", 10007, "EV Charger HW Fault 1", "", Kind.AC),
+        Integer("hw_fault_08", 10008, "EV Charger HW Fault 2", "", Kind.AC),
+        Voltage("voltage_a", 10009, "Charge Voltage", Kind.AC),
+        Current("current_a", 10012, "Charge Current", Kind.AC),
+        Decimal("charging_power", 10015, 10, "EV Charge Power", "kW", Kind.AC),
+        Decimal("session_energy", 10016, 10, "Session Energy", "kWh", Kind.AC),
+        Enum2("charger_status", 10017, CHARGER_STATUS_MODES, "Charger Status", Kind.AC),
+        Integer("charger_status_code", 10017, "Charger Status Code", "", Kind.AC),
+        Integer("comm_status", 10018, "Connection Status Bits", "", Kind.AC),
     )
 
     # Runtime block 2 sensors (registers 10060-10108, same for all phase types)
     __sensors_block2: tuple[Sensor, ...] = (
-        Integer("charge_on_off", 10060, "Charge On/Off Control", "", Kind.AC),
-        Long("charge_duration", 10063, "Charge Duration", "s", Kind.AC),
-        Energy4("total_energy", 10065, "Total Accumulated Energy", Kind.AC),
-        Enum2("car_connection", 10075, CAR_CONNECTION_MODES, "Car Connection Status", Kind.AC),
-        Enum2("charge_start_mode", 10076, CHARGE_START_MODES, "Charge Starting Mode", Kind.AC),
-        Enum2("charging_strategy", 10077, CHARGE_MODE_MODES, "Charging Strategy", Kind.AC),
-        Energy4("green_energy", 10103, "Green Energy", Kind.AC),
-        Energy4("grid_energy", 10105, "Grid Energy Used for Charging", Kind.AC),
-        Integer("power_source", 10108, "Charging Power Source", "", Kind.AC),
+        Integer("charge_on_off", 10060, "Charge State", "", Kind.AC),
+        Long("charge_duration", 10063, "Session Duration", "s", Kind.AC),
+        Energy4("total_energy", 10065, "Total Charged Energy", Kind.AC),
+        Enum2("car_connection", 10075, CAR_CONNECTION_MODES, "EV Connection", Kind.AC),
+        Enum2("charge_start_mode", 10076, CHARGE_START_MODES, "Session Start Method", Kind.AC),
+        Enum2("charging_strategy", 10077, CHARGING_STRATEGY_MODES, "Charging Strategy", Kind.AC),
+        Energy4("green_energy", 10103, "Session Green Energy", Kind.AC),
+        Energy4("grid_energy", 10105, "Session Grid Energy", Kind.AC),
+        # Power source bitmask: bit0=grid, bit1=PV, bit2=battery
+        Integer("power_source_code", 10108, "Charge Power Source Code", "", Kind.AC),
+        PowerSourceSensor("power_source", 10108, "Charge Power Source", Kind.AC),
     )
 
     __all_settings: tuple[Sensor, ...] = (
-        Integer("ems_dispatch", 10000, "EMS Dispatch"),
-        Integer("plug_and_charge", 10019, "Plug and Charge"),
-        Integer("dynamic_load_mgmt", 10025, "Dynamic Load Management"),
+        Integer("ems_dispatch", 10000, "EMS Energy Dispatch"),
+        Integer("plug_and_charge", 10019, "Plug and Charge Enable"),
+        Integer("dynamic_load_mgmt", 10025, "Dynamic Load Management Enable"),
         Decimal("max_charging_power", 10029, 10, "Max Charging Power", "kW"),
+        # 0=fast charge, 1=PV only, 2=PV+battery
         Integer("advanced_charging_mode", 10032, "Advanced Charging Mode"),
         Decimal("grid_power_limit", 10039, 10, "Grid Power Limit", "kW"),
         # Register 10060: 1=off, 2=on (non-standard values)
