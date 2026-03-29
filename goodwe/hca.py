@@ -9,7 +9,7 @@ from .exceptions import InverterError, RequestFailedException
 from .inverter import Inverter, OperationMode, Sensor, SensorKind as Kind
 from .protocol import ProtocolCommand
 from .sensor import (
-    Current, Decimal, Energy4, Enum2, Integer, Long, Voltage,
+    Current, Decimal, Energy4, Enum2, Integer, Long, SwitchValue, Voltage,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,7 +121,8 @@ class HCA(Inverter):
         Decimal("max_charging_power", 10029, 10, "Max Charging Power", "kW"),
         Integer("advanced_charging_mode", 10032, "Advanced Charging Mode"),
         Decimal("grid_power_limit", 10039, 10, "Grid Power Limit", "kW"),
-        Integer("charge_enabled", 10060, "Charge Enabled"),
+        # Register 10060: 1=off, 2=on (non-standard values)
+        SwitchValue("charge_enabled", 10060, "Charge Enabled", on_value=2, off_value=1),
     )
 
     def __init__(self, host: str, port: int = GOODWE_TCP_PORT, comm_addr: int = 0xF7,
