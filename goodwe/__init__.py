@@ -63,7 +63,7 @@ async def connect(host: str, port: int = GOODWE_UDP_PORT, family: str = None, co
     elif family in DT_FAMILY:
         inv = DT(host, port, comm_addr, timeout, retries)
     elif family in HCA_FAMILY:
-        inv = HCA(host, port, comm_addr, timeout, retries)
+        inv = HCA(host, port, comm_addr if comm_addr else 0xF7, timeout, retries)
     elif do_discover:
         return await discover(host, port, timeout, retries)
     else:

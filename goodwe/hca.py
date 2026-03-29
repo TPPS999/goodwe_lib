@@ -1,128 +1,181 @@
-"""HCA EV charger support - GoodWe HCA/HCA G2 EV charger series"""
+"""HCA G2 EV charger support - GoodWe HCA G2 EV charger series"""
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from .const import GOODWE_TCP_PORT
 from .exceptions import InverterError, RequestFailedException
 from .inverter import Inverter, OperationMode, Sensor, SensorKind as Kind
-from .protocol import ProtocolCommand, ProtocolResponse
+from .protocol import ProtocolCommand
 from .sensor import (
-    Current, Energy, Energy4, Enum2, Integer, Long, Power, Voltage,
-    read_bytes4,
+    Current, Decimal, Energy4, Enum2, Integer, Long, Voltage,
 )
 
 logger = logging.getLogger(__name__)
 
 
-CP_STATUS_MODES: dict[int, str] = {
+CHARGER_STATUS_MODES: dict[int, str] = {
+    0: "Idle",
+    1: "Idle (plugged)",
+    2: "Handshaking",
+    3: "Charging",
+    4: "Complete",
+    5: "Alarm",
+    6: "Scheduled",
+    7: "Maintenance",
+    8: "Start failed",
+    9: "Upgrading",
+    10: "Interrupted",
+}
+
+CAR_CONNECTION_MODES: dict[int, str] = {
     0: "Disconnected",
-    1: "Connected",
-    2: "Charging",
-    3: "Fault",
+    1: "Half-connected",
+    2: "Connected",
 }
 
-EV_CHARGER_STATUS_MODES: dict[int, str] = {
-    0: "Initial",
-    1: "Fault",
-    2: "Standby",
-    3: "Running",
-    4: "Shutdown",
-    5: "Reserved",
-    6: "Self-testing",
-    7: "Starting",
-    8: "Ready",
+CHARGE_MODE_MODES: dict[int, str] = {
+    0: "Fast",
+    1: "PV Only",
+    2: "PV + Battery",
 }
 
-CHARGING_MODES: dict[int, str] = {
-    0: "Plug and Play",
-    1: "Scheduled",
-    2: "PV Only",
-    3: "Plug and Play + Scheduled",
+CHARGE_START_MODES: dict[int, str] = {
+    0: "RFID card",
+    1: "Remote",
+    2: "Local admin",
+    3: "VIN",
+    4: "Wallet card",
+    5: "Plug & Play",
+    6: "Scheduled",
+    7: "Bluetooth app",
 }
-
-
-class Hours4(Sensor):
-    """Sensor representing time [h] value encoded in 4 (unsigned) bytes, scale factor 10"""
-
-    def __init__(self, id_: str, offset: int, name: str, kind: Optional[Kind] = None):
-        super().__init__(id_, offset, name, 4, "h", kind)
-
-    def read_value(self, data: ProtocolResponse) -> Any:
-        value = read_bytes4(data)
-        return float(value) / 10 if value is not None else None
-
-    def encode_value(self, value: Any, register_value: bytes = None) -> bytes:
-        raise NotImplementedError()
 
 
 class HCA(Inverter):
-    """Class representing GoodWe HCA/HCA G2 EV charger series.
+    """Class representing GoodWe HCA G2 EV charger series.
 
     Communicates via standard Modbus TCP (port 502).
     Supported models: GW7K-HCA-20 (1-phase), GW11K-HCA-20 (3-phase), GW22K-HCA-20 (3-phase).
     Model tag in serial number: HPA (e.g. 5022KHPA257L2133).
     """
 
-    # Modbus registers 10600-10621, count 22
-    __all_sensors: tuple[Sensor, ...] = (
-        Voltage("cp_voltage", 10600, "CP Voltage", Kind.AC),
-        Integer("leak_current", 10601, "Leak Current", "mA", Kind.AC),
-        Integer("cp_status", 10602, "CP Status code", "", Kind.AC),
-        Enum2("cp_status_label", 10602, CP_STATUS_MODES, "CP Status", Kind.AC),
-        Power("solar_power_for_charge", 10603, "Solar Power for Charge", Kind.PV),
-        Power("battery_power_for_charge", 10604, "Battery Power for Charge", Kind.BAT),
-        Power("grid_power_for_charge", 10605, "Grid Power for Charge", Kind.GRID),
-        Energy("charge_energy", 10606, "Current Charge Energy", Kind.AC),
-        Integer("charge_time", 10607, "Current Charge Time", "min", Kind.AC),
-        Current("charge_current", 10608, "Charge Current", Kind.AC),
-        Integer("charger_status", 10609, "EV Charger Status code", "", Kind.AC),
-        Enum2("charger_status_label", 10609, EV_CHARGER_STATUS_MODES, "EV Charger Status", Kind.AC),
-        Long("charger_error", 10610, "EV Charger Error Message"),
-        Integer("charging_mode", 10612, "Charging Mode code", "", Kind.AC),
-        Enum2("charging_mode_label", 10612, CHARGING_MODES, "Charging Mode", Kind.AC),
-        Integer("max_charge_current", 10613, "Max Charge Current", "A", Kind.AC),
-        Power("charge_power", 10614, "Charge Power", Kind.AC),
-        Energy4("total_charge_energy", 10615, "Total Charge Energy", Kind.AC),
-        Hours4("total_charge_time", 10617, "Total Charge Time"),
-        Voltage("ev_output_voltage", 10619, "EV Output Voltage", Kind.AC),
-        Voltage("ac_input_voltage", 10620, "AC Input Voltage", Kind.AC),
-        Integer("ev_com_lost", 10621, "EV Communication Lost", "", Kind.AC),
+    # Runtime block 1 sensors - 3-phase (registers 10000-10018)
+    __sensors_block1_3phase: tuple[Sensor, ...] = (
+        Integer("ac_fault_01", 10001, "AC Fault Bytes 01", "", Kind.AC),
+        Integer("ac_fault_02", 10002, "AC Fault Bytes 02", "", Kind.AC),
+        Integer("ac_fault_03", 10003, "AC Fault Bytes 03", "", Kind.AC),
+        Integer("ac_fault_04", 10004, "AC Fault Bytes 04", "", Kind.AC),
+        Integer("ac_alarm_05", 10005, "AC Alarm Bytes 05", "", Kind.AC),
+        Integer("ac_alarm_06", 10006, "AC Alarm Bytes 06", "", Kind.AC),
+        Integer("hw_fault_07", 10007, "HW Fault Bytes 07", "", Kind.AC),
+        Integer("hw_fault_08", 10008, "HW Fault Bytes 08", "", Kind.AC),
+        Voltage("voltage_a", 10009, "A Phase Voltage", Kind.AC),
+        Voltage("voltage_b", 10010, "B Phase Voltage", Kind.AC),
+        Voltage("voltage_c", 10011, "C Phase Voltage", Kind.AC),
+        Current("current_a", 10012, "A Phase Current", Kind.AC),
+        Current("current_b", 10013, "B Phase Current", Kind.AC),
+        Current("current_c", 10014, "C Phase Current", Kind.AC),
+        Decimal("charging_power", 10015, 10, "Charging Power", "kW", Kind.AC),
+        Decimal("session_energy", 10016, 10, "Current Session Energy", "kWh", Kind.AC),
+        Enum2("charger_status", 10017, CHARGER_STATUS_MODES, "Station Status", Kind.AC),
+        Integer("comm_status", 10018, "Communication Status", "", Kind.AC),
+    )
+
+    # Runtime block 1 sensors - single-phase (B/C phase sensors excluded)
+    __sensors_block1_1phase: tuple[Sensor, ...] = (
+        Integer("ac_fault_01", 10001, "AC Fault Bytes 01", "", Kind.AC),
+        Integer("ac_fault_02", 10002, "AC Fault Bytes 02", "", Kind.AC),
+        Integer("ac_fault_03", 10003, "AC Fault Bytes 03", "", Kind.AC),
+        Integer("ac_fault_04", 10004, "AC Fault Bytes 04", "", Kind.AC),
+        Integer("ac_alarm_05", 10005, "AC Alarm Bytes 05", "", Kind.AC),
+        Integer("ac_alarm_06", 10006, "AC Alarm Bytes 06", "", Kind.AC),
+        Integer("hw_fault_07", 10007, "HW Fault Bytes 07", "", Kind.AC),
+        Integer("hw_fault_08", 10008, "HW Fault Bytes 08", "", Kind.AC),
+        Voltage("voltage_a", 10009, "A Phase Voltage", Kind.AC),
+        Current("current_a", 10012, "A Phase Current", Kind.AC),
+        Decimal("charging_power", 10015, 10, "Charging Power", "kW", Kind.AC),
+        Decimal("session_energy", 10016, 10, "Current Session Energy", "kWh", Kind.AC),
+        Enum2("charger_status", 10017, CHARGER_STATUS_MODES, "Station Status", Kind.AC),
+        Integer("comm_status", 10018, "Communication Status", "", Kind.AC),
+    )
+
+    # Runtime block 2 sensors (registers 10060-10108, same for all phase types)
+    __sensors_block2: tuple[Sensor, ...] = (
+        Integer("charge_on_off", 10060, "Charge On/Off Control", "", Kind.AC),
+        Long("charge_duration", 10063, "Charge Duration", "s", Kind.AC),
+        Energy4("total_energy", 10065, "Total Accumulated Energy", Kind.AC),
+        Enum2("car_connection", 10075, CAR_CONNECTION_MODES, "Car Connection Status", Kind.AC),
+        Enum2("charge_start_mode", 10076, CHARGE_START_MODES, "Charge Starting Mode", Kind.AC),
+        Enum2("charging_strategy", 10077, CHARGE_MODE_MODES, "Charging Strategy", Kind.AC),
+        Energy4("green_energy", 10103, "Green Energy", Kind.AC),
+        Energy4("grid_energy", 10105, "Grid Energy Used for Charging", Kind.AC),
+        Integer("power_source", 10108, "Charging Power Source", "", Kind.AC),
     )
 
     __all_settings: tuple[Sensor, ...] = (
-        Integer("charging_mode_set", 20320, "Charging Mode"),
-        Integer("max_charge_current_set", 20323, "Max Charge Current", "A"),
-        Integer("off_grid_charge_enable", 20332, "Off Grid Charge Enable"),
+        Integer("ems_dispatch", 10000, "EMS Dispatch"),
+        Integer("plug_and_charge", 10019, "Plug and Charge"),
+        Integer("dynamic_load_mgmt", 10025, "Dynamic Load Management"),
+        Decimal("max_charging_power", 10029, 10, "Max Charging Power", "kW"),
+        Integer("advanced_charging_mode", 10032, "Advanced Charging Mode"),
+        Decimal("grid_power_limit", 10039, 10, "Grid Power Limit", "kW"),
+        Integer("charge_enabled", 10060, "Charge Enabled"),
     )
 
-    def __init__(self, host: str, port: int = GOODWE_TCP_PORT, comm_addr: int = 0,
+    def __init__(self, host: str, port: int = GOODWE_TCP_PORT, comm_addr: int = 0xF7,
                  timeout: int = 1, retries: int = 3):
         super().__init__(host, port, comm_addr, timeout, retries)
-        # Device info registers: 10670 (SW ver) + 10671-10678 (SN 8 regs) + 10679-10694 (model 16 regs) = 25 regs
-        self._READ_DEVICE_INFO: ProtocolCommand = self._read_command(10670, 25)
-        # Runtime data: registers 10600-10621, count 22
-        self._READ_RUNNING_DATA: ProtocolCommand = self._read_command(10600, 22)
-        self._sensors: tuple[Sensor, ...] = self.__all_sensors
+        # Device info: register 10040, count 20 (registers 10040-10059)
+        self._READ_DEVICE_INFO: ProtocolCommand = self._read_command(10040, 20)
+        # Runtime block 1: register 10000, count 19 (registers 10000-10018)
+        self._READ_RUNNING_DATA: ProtocolCommand = self._read_command(10000, 19)
+        # Runtime block 2: register 10060, count 49 (registers 10060-10108)
+        self._READ_RUNNING_DATA2: ProtocolCommand = self._read_command(10060, 49)
+        self._is_single_phase: bool = False
+        self._sensors_block1: tuple[Sensor, ...] = self.__sensors_block1_3phase
         self._sensors_map: dict[str, Sensor] | None = None
         self._settings_map: dict[str, Sensor] = {s.id_: s for s in self.__all_settings}
 
     async def read_device_info(self):
         response = await self._read_from_socket(self._READ_DEVICE_INFO)
         raw = response.response_data()
-        # Register 10670: Software Version (2 bytes)
-        self.dsp1_version = int.from_bytes(raw[0:2], byteorder='big', signed=False)
-        self.firmware = str(self.dsp1_version)
-        # Registers 10671-10678: EV Charger SN (8 registers = 16 bytes)
-        self.serial_number = self._decode(raw[2:18])
-        # Registers 10679-10694: EV Charger Model Name (16 registers = 32 bytes)
-        self.model_name = self._decode(raw[18:50])
-        logger.debug("HCA device: model=%s, S/N=%s, fw=%s", self.model_name, self.serial_number, self.firmware)
+        # Registers 10040-10047 (8 regs = 16 bytes): SN Number
+        self.serial_number = self._decode(raw[0:16])
+        # Registers 10048-10049 (2 regs = 4 bytes): Software version external
+        self.firmware = self._decode(raw[16:20])
+        # Register 10050 (1 reg = 2 bytes): SVN version (offset 20-21)
+        # Registers 10056-10057 (2 regs = 4 bytes): Hardware Version (offset 32-35)
+        self.model_name = self._decode(raw[32:36])
+        # Register 10058 (1 reg = 2 bytes): Power Spec (offset 36-37)
+        power_spec = int.from_bytes(raw[36:38], byteorder='big', signed=False)
+        # Register 10059 (1 reg = 2 bytes): Phase type (offset 38-39)
+        phase_type = int.from_bytes(raw[38:40], byteorder='big', signed=False)
+        self._is_single_phase = (phase_type == 1)
+        if self._is_single_phase:
+            self._sensors_block1 = self.__sensors_block1_1phase
+        else:
+            self._sensors_block1 = self.__sensors_block1_3phase
+        self._sensors_map = None
+        power_spec_names = {0: "7kW", 1: "11kW", 2: "22kW"}
+        power_spec_str = power_spec_names.get(power_spec, str(power_spec))
+        phase_str = "single-phase" if self._is_single_phase else "3-phase"
+        logger.debug(
+            "HCA device: S/N=%s, fw=%s, hw=%s, power=%s, phase=%s",
+            self.serial_number, self.firmware, self.model_name, power_spec_str, phase_str,
+        )
+
+    @property
+    def is_single_phase(self) -> bool:
+        """Return True if device is a single-phase charger."""
+        return self._is_single_phase
 
     async def read_runtime_data(self) -> dict[str, Any]:
-        response = await self._read_from_socket(self._READ_RUNNING_DATA)
-        data = self._map_response(response, self._sensors)
+        response1 = await self._read_from_socket(self._READ_RUNNING_DATA)
+        response2 = await self._read_from_socket(self._READ_RUNNING_DATA2)
+        data = self._map_response(response1, self._sensors_block1)
+        data.update(self._map_response(response2, self.__sensors_block2))
         data["serial_number"] = self.serial_number
         return data
 
@@ -204,7 +257,7 @@ class HCA(Inverter):
         return ""
 
     def sensors(self) -> tuple[Sensor, ...]:
-        return self._sensors
+        return self._sensors_block1 + self.__sensors_block2
 
     def settings(self) -> tuple[Sensor, ...]:
         return tuple(self._settings_map.values())
