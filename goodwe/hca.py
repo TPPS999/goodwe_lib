@@ -60,6 +60,20 @@ CHARGING_STRATEGY_MODES: dict[int, str] = {
     3: "By energy",
 }
 
+RESERVATION_STATUS_MODES: dict[int, str] = {
+    0: "Inactive",
+    1: "Single use",
+    2: "Permanent",
+}
+
+CP_VOLTAGE_STATES: dict[int, str] = {
+    0: "No voltage",
+    1: "12V",
+    2: "9V",
+    3: "6V",
+    4: "3V",
+}
+
 
 class PowerSourceSensor(Sensor):
     """Sensor representing charging power source as human-readable text.
@@ -89,11 +103,18 @@ class HCA(Inverter):
     Communicates via standard Modbus TCP (port 502).
     Supported models: GW7K-HCA-20 (1-phase), GW11K-HCA-20 (3-phase), GW22K-HCA-20 (3-phase).
     Model tag in serial number: HPA (e.g. 5022KHPA257L2133).
+
+    Register blocks:
+      Block 1: 10000-10084 (85 regs) - faults, measurements, settings area, misc state
+      Block 2: 10103-10108 (6 regs)  - session energy sources + project type
+      Block 3: 10157-10176 (20 regs) - last session record
     """
 
-    # Runtime block 1 sensors - 3-phase (registers 10000-10018)
+    # -------------------------------------------------------------------------
+    # Block 1 sensors (10000-10084) - 3-phase variant
+    # -------------------------------------------------------------------------
     __sensors_block1_3phase: tuple[Sensor, ...] = (
-        # Fault/alarm status registers (bitmasks - non-zero means fault active)
+        # Fault/alarm status registers (bitmasks - non-zero means fault/alarm active)
         Integer("ac_fault_01", 10001, "EV Charger AC Fault 1", "", Kind.AC),
         Integer("ac_fault_02", 10002, "EV Charger AC Fault 2", "", Kind.AC),
         Integer("ac_fault_03", 10003, "EV Charger AC Fault 3", "", Kind.AC),
@@ -102,24 +123,54 @@ class HCA(Inverter):
         Integer("ac_alarm_06", 10006, "EV Charger AC Alarm 2", "", Kind.AC),
         Integer("hw_fault_07", 10007, "EV Charger HW Fault 1", "", Kind.AC),
         Integer("hw_fault_08", 10008, "EV Charger HW Fault 2", "", Kind.AC),
-        # AC measurements
+        # AC measurements - 3-phase
         Voltage("voltage_a", 10009, "Charge Voltage L1", Kind.AC),
         Voltage("voltage_b", 10010, "Charge Voltage L2", Kind.AC),
         Voltage("voltage_c", 10011, "Charge Voltage L3", Kind.AC),
         Current("current_a", 10012, "Charge Current L1", Kind.AC),
         Current("current_b", 10013, "Charge Current L2", Kind.AC),
         Current("current_c", 10014, "Charge Current L3", Kind.AC),
-        # Power and energy
+        # Power and session energy
         Decimal("charging_power", 10015, 10, "EV Charge Power", "kW", Kind.AC),
         Decimal("session_energy", 10016, 10, "Session Energy", "kWh", Kind.AC),
-        # Status
+        # Charger status - exposed as both enum (human-readable) and raw int
         Enum2("charger_status", 10017, CHARGER_STATUS_MODES, "Charger Status", Kind.AC),
         Integer("charger_status_code", 10017, "Charger Status Code", "", Kind.AC),
+        # Communication connectivity bitmask
         Integer("comm_status", 10018, "Connection Status Bits", "", Kind.AC),
+        # Settings area (10019-10039) - also exposed as sensors for polling
+        Integer("plug_and_charge_state", 10019, "Plug and Charge State", "", Kind.AC),
+        Enum2("reservation_status", 10020, RESERVATION_STATUS_MODES, "Reservation Status", Kind.AC),
+        Integer("reservation_start_time", 10021, "Reservation Start Time", "", Kind.AC),
+        Integer("reservation_duration", 10022, "Reservation Duration", "min", Kind.AC),
+        Integer("single_phase_switch_state", 10023, "Single/3-phase Switch State", "", Kind.AC),
+        Integer("min_power_enable_state", 10024, "Min Charging Power State", "", Kind.AC),
+        Integer("dynamic_load_mgmt_state", 10025, "Dynamic Load Management State", "", Kind.AC),
+        Integer("household_breaker_current", 10026, "Household Breaker Current", "A", Kind.AC),
+        Decimal("max_charging_capacity", 10027, 10, "Max Charging Capacity", "kWh", Kind.AC),
+        Decimal("min_charging_capacity", 10028, 10, "Min Charging Capacity", "kWh", Kind.AC),
+        Decimal("max_charging_power_state", 10029, 10, "Max Charging Power", "kW", Kind.AC),
+        Integer("battery_discharge_soc", 10030, "Battery Discharge SOC Limit", "%", Kind.BAT),
+        Integer("completion_time", 10031, "Completion Time", "h", Kind.AC),
+        Enum2("charging_mode_state", 10032, CHARGING_MODE_MODES, "Charging Mode", Kind.AC),
+        Decimal("grid_power_limit_state", 10039, 10, "Grid Power Limit", "kW", Kind.GRID),
+        # Charge on/off state and session metrics
+        Integer("charge_state", 10060, "Charge State", "", Kind.AC),
+        Long("charge_duration", 10063, "Session Duration", "s", Kind.AC),
+        Energy4("total_energy", 10065, "Total Charged Energy", Kind.AC),
+        # Car connection and session info
+        Enum2("car_connection", 10075, CAR_CONNECTION_MODES, "EV Connection", Kind.AC),
+        Enum2("charge_start_mode", 10076, CHARGE_START_MODES, "Session Start Method", Kind.AC),
+        Enum2("charging_strategy", 10077, CHARGING_STRATEGY_MODES, "Charging Strategy", Kind.AC),
+        # CP pilot voltage state
+        Enum2("cp_voltage_state", 10084, CP_VOLTAGE_STATES, "CP Voltage State", Kind.AC),
     )
 
-    # Runtime block 1 sensors - single-phase (B/C phase sensors excluded)
+    # -------------------------------------------------------------------------
+    # Block 1 sensors (10000-10084) - single-phase variant (B/C phase excluded)
+    # -------------------------------------------------------------------------
     __sensors_block1_1phase: tuple[Sensor, ...] = (
+        # Fault/alarm status registers
         Integer("ac_fault_01", 10001, "EV Charger AC Fault 1", "", Kind.AC),
         Integer("ac_fault_02", 10002, "EV Charger AC Fault 2", "", Kind.AC),
         Integer("ac_fault_03", 10003, "EV Charger AC Fault 3", "", Kind.AC),
@@ -128,35 +179,104 @@ class HCA(Inverter):
         Integer("ac_alarm_06", 10006, "EV Charger AC Alarm 2", "", Kind.AC),
         Integer("hw_fault_07", 10007, "EV Charger HW Fault 1", "", Kind.AC),
         Integer("hw_fault_08", 10008, "EV Charger HW Fault 2", "", Kind.AC),
+        # AC measurements - single-phase only
         Voltage("voltage_a", 10009, "Charge Voltage", Kind.AC),
         Current("current_a", 10012, "Charge Current", Kind.AC),
+        # Power and session energy
         Decimal("charging_power", 10015, 10, "EV Charge Power", "kW", Kind.AC),
         Decimal("session_energy", 10016, 10, "Session Energy", "kWh", Kind.AC),
+        # Charger status
         Enum2("charger_status", 10017, CHARGER_STATUS_MODES, "Charger Status", Kind.AC),
         Integer("charger_status_code", 10017, "Charger Status Code", "", Kind.AC),
+        # Communication connectivity bitmask
         Integer("comm_status", 10018, "Connection Status Bits", "", Kind.AC),
-    )
-
-    # Runtime block 2 sensors (registers 10060-10108, same for all phase types)
-    __sensors_block2: tuple[Sensor, ...] = (
-        Integer("charge_on_off", 10060, "Charge State", "", Kind.AC),
+        # Settings area (10019-10039) - also exposed as sensors for polling
+        Integer("plug_and_charge_state", 10019, "Plug and Charge State", "", Kind.AC),
+        Enum2("reservation_status", 10020, RESERVATION_STATUS_MODES, "Reservation Status", Kind.AC),
+        Integer("reservation_start_time", 10021, "Reservation Start Time", "", Kind.AC),
+        Integer("reservation_duration", 10022, "Reservation Duration", "min", Kind.AC),
+        Integer("single_phase_switch_state", 10023, "Single/3-phase Switch State", "", Kind.AC),
+        Integer("min_power_enable_state", 10024, "Min Charging Power State", "", Kind.AC),
+        Integer("dynamic_load_mgmt_state", 10025, "Dynamic Load Management State", "", Kind.AC),
+        Integer("household_breaker_current", 10026, "Household Breaker Current", "A", Kind.AC),
+        Decimal("max_charging_capacity", 10027, 10, "Max Charging Capacity", "kWh", Kind.AC),
+        Decimal("min_charging_capacity", 10028, 10, "Min Charging Capacity", "kWh", Kind.AC),
+        Decimal("max_charging_power_state", 10029, 10, "Max Charging Power", "kW", Kind.AC),
+        Integer("battery_discharge_soc", 10030, "Battery Discharge SOC Limit", "%", Kind.BAT),
+        Integer("completion_time", 10031, "Completion Time", "h", Kind.AC),
+        Enum2("charging_mode_state", 10032, CHARGING_MODE_MODES, "Charging Mode", Kind.AC),
+        Decimal("grid_power_limit_state", 10039, 10, "Grid Power Limit", "kW", Kind.GRID),
+        # Charge on/off state and session metrics
+        Integer("charge_state", 10060, "Charge State", "", Kind.AC),
         Long("charge_duration", 10063, "Session Duration", "s", Kind.AC),
         Energy4("total_energy", 10065, "Total Charged Energy", Kind.AC),
+        # Car connection and session info
         Enum2("car_connection", 10075, CAR_CONNECTION_MODES, "EV Connection", Kind.AC),
         Enum2("charge_start_mode", 10076, CHARGE_START_MODES, "Session Start Method", Kind.AC),
         Enum2("charging_strategy", 10077, CHARGING_STRATEGY_MODES, "Charging Strategy", Kind.AC),
-        Energy4("green_energy", 10103, "Session Green Energy", Kind.AC),
-        Energy4("grid_energy", 10105, "Session Grid Energy", Kind.AC),
+        # CP pilot voltage state
+        Enum2("cp_voltage_state", 10084, CP_VOLTAGE_STATES, "CP Voltage State", Kind.AC),
+    )
+
+    # -------------------------------------------------------------------------
+    # Block 2 sensors (10103-10108) - energy sources, same for all phase types
+    # -------------------------------------------------------------------------
+    __sensors_block2: tuple[Sensor, ...] = (
+        # Green energy (PV/battery sourced) for this session (U32, /10, kWh)
+        Energy4("green_energy", 10103, "Session Green Energy", Kind.PV),
+        # Grid energy consumed in this session (U32, /10, kWh)
+        Energy4("grid_energy", 10105, "Session Grid Energy", Kind.GRID),
+        # Project type: 0/1=DC, 2=AC
+        Integer("project_type", 10107, "Charger Project Type", "", Kind.AC),
         # Power source bitmask: bit0=grid, bit1=PV, bit2=battery
         Integer("power_source_code", 10108, "Charge Power Source Code", "", Kind.AC),
         PowerSourceSensor("power_source", 10108, "Charge Power Source", Kind.AC),
     )
 
+    # -------------------------------------------------------------------------
+    # Block 3 sensors (10157-10176) - last session record
+    # -------------------------------------------------------------------------
+    __sensors_block3: tuple[Sensor, ...] = (
+        # Transparent mode: 0=IoT, 1=gateway
+        Integer("transparent_mode", 10157, "Transparent Mode", "", Kind.AC),
+        # Last session start time (packed: high byte=year/day/min, low byte=month/hour/sec)
+        Integer("last_charge_start_ym", 10158, "Last Session Start (YY/MM)", "", Kind.AC),
+        Integer("last_charge_start_dh", 10159, "Last Session Start (DD/HH)", "", Kind.AC),
+        Integer("last_charge_start_ms", 10160, "Last Session Start (MM/SS)", "", Kind.AC),
+        # 10161 reserved
+        # Last session end time
+        Integer("last_charge_end_ym", 10162, "Last Session End (YY/MM)", "", Kind.AC),
+        Integer("last_charge_end_dh", 10163, "Last Session End (DD/HH)", "", Kind.AC),
+        Integer("last_charge_end_ms", 10164, "Last Session End (MM/SS)", "", Kind.AC),
+        # 10165 reserved
+        # Session metrics
+        Long("last_charge_duration", 10166, "Last Session Duration", "s", Kind.AC),
+        Long("last_charge_end_reason", 10168, "Last Session End Reason", "", Kind.AC),
+        # Meter readings in 0.01 kWh units
+        Long("meter_before_charge", 10170, "Meter Reading Before Session", "", Kind.AC),
+        Long("meter_after_charge", 10172, "Meter Reading After Session", "", Kind.AC),
+        Long("charge_record_index", 10174, "Charge Record Index", "", Kind.AC),
+        Integer("session_energy_cleared", 10176, "Session Energy Cleared", "", Kind.AC),
+    )
+
+    # -------------------------------------------------------------------------
+    # All settings (read-write registers)
+    # -------------------------------------------------------------------------
     __all_settings: tuple[Sensor, ...] = (
         Integer("ems_dispatch", 10000, "EMS Energy Dispatch"),
         Integer("plug_and_charge", 10019, "Plug and Charge Enable"),
+        Integer("reservation_status_set", 10020, "Reservation Status"),
+        Integer("reservation_start_time_set", 10021, "Reservation Start Time"),
+        Integer("reservation_duration_set", 10022, "Reservation Duration", "min"),
+        Integer("single_phase_switch", 10023, "Single/3-phase Switch"),
+        Integer("min_power_enable", 10024, "Min Charging Power Enable"),
         Integer("dynamic_load_mgmt", 10025, "Dynamic Load Management Enable"),
+        Integer("household_breaker", 10026, "Household Breaker Current", "A"),
+        Decimal("max_capacity", 10027, 10, "Max Charging Capacity", "kWh"),
+        Decimal("min_capacity", 10028, 10, "Min Charging Capacity", "kWh"),
         Decimal("max_charging_power", 10029, 10, "Max Charging Power", "kW"),
+        Integer("battery_discharge_soc_set", 10030, "Battery Discharge SOC Limit", "%"),
+        Integer("completion_time_set", 10031, "Completion Time", "h"),
         # 0=fast charge, 1=PV only, 2=PV+battery
         Integer("advanced_charging_mode", 10032, "Advanced Charging Mode"),
         Decimal("grid_power_limit", 10039, 10, "Grid Power Limit", "kW"),
@@ -167,12 +287,14 @@ class HCA(Inverter):
     def __init__(self, host: str, port: int = GOODWE_TCP_PORT, comm_addr: int = 0xF7,
                  timeout: int = 1, retries: int = 3):
         super().__init__(host, port, comm_addr, timeout, retries)
-        # Device info: register 10040, count 20 (registers 10040-10059)
+        # Device info: registers 10040-10059 (20 regs)
         self._READ_DEVICE_INFO: ProtocolCommand = self._read_command(10040, 20)
-        # Runtime block 1: register 10000, count 19 (registers 10000-10018)
-        self._READ_RUNNING_DATA: ProtocolCommand = self._read_command(10000, 19)
-        # Runtime block 2: register 10060, count 49 (registers 10060-10108)
-        self._READ_RUNNING_DATA2: ProtocolCommand = self._read_command(10060, 49)
+        # Block 1: registers 10000-10084 (85 regs) - faults, measurements, settings, misc
+        self._READ_RUNNING_DATA: ProtocolCommand = self._read_command(10000, 85)
+        # Block 2: registers 10103-10108 (6 regs) - session energy sources
+        self._READ_RUNNING_DATA2: ProtocolCommand = self._read_command(10103, 6)
+        # Block 3: registers 10157-10176 (20 regs) - last session record
+        self._READ_RUNNING_DATA3: ProtocolCommand = self._read_command(10157, 20)
         self._is_single_phase: bool = False
         self._sensors_block1: tuple[Sensor, ...] = self.__sensors_block1_3phase
         self._sensors_map: dict[str, Sensor] | None = None
@@ -214,8 +336,10 @@ class HCA(Inverter):
     async def read_runtime_data(self) -> dict[str, Any]:
         response1 = await self._read_from_socket(self._READ_RUNNING_DATA)
         response2 = await self._read_from_socket(self._READ_RUNNING_DATA2)
+        response3 = await self._read_from_socket(self._READ_RUNNING_DATA3)
         data = self._map_response(response1, self._sensors_block1)
         data.update(self._map_response(response2, self.__sensors_block2))
+        data.update(self._map_response(response3, self.__sensors_block3))
         data["serial_number"] = self.serial_number
         return data
 
@@ -297,7 +421,7 @@ class HCA(Inverter):
         return ""
 
     def sensors(self) -> tuple[Sensor, ...]:
-        return self._sensors_block1 + self.__sensors_block2
+        return self._sensors_block1 + self.__sensors_block2 + self.__sensors_block3
 
     def settings(self) -> tuple[Sensor, ...]:
         return tuple(self._settings_map.values())
