@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, Optional
 
 from .const import GOODWE_TCP_PORT
@@ -131,6 +132,38 @@ CP_VOLTAGE_STATES: dict[int, str] = {
 }
 
 
+class PackedTimeSensor(Sensor):
+    """Sensor for a packed 2-byte time register (high byte / low byte).
+
+    Formats:
+      "YM" -> high=2-digit year, low=month  -> "2025-03"
+      "DH" -> high=day, low=hour            -> "29 14h"
+      "MS" -> high=minute, low=second       -> "30m 45s"
+    """
+
+    _FMT_YM = "YM"
+    _FMT_DH = "DH"
+    _FMT_MS = "MS"
+
+    def __init__(self, id_: str, offset: int, name: str, fmt: str,
+                 kind: Optional[Kind] = None):
+        super().__init__(id_, offset, name, 2, "", kind)
+        self._fmt = fmt
+
+    def read_value(self, data: ProtocolResponse) -> str:
+        raw = read_bytes2(data)
+        if raw is None:
+            return "N/A"
+        high = (raw >> 8) & 0xFF
+        low = raw & 0xFF
+        if self._fmt == self._FMT_YM:
+            return f"20{high:02d}-{low:02d}"
+        elif self._fmt == self._FMT_DH:
+            return f"{high:02d}d {low:02d}h"
+        else:  # MS
+            return f"{high:02d}m {low:02d}s"
+
+
 class FaultBitmaskSensor(Sensor):
     """Sensor representing a fault/alarm register as human-readable text.
 
@@ -242,10 +275,10 @@ class HCA(Inverter):
         Long("charge_amount", 10061, "Session Charge Amount", "", Kind.AC),
         Long("charge_duration", 10063, "Session Duration", "s", Kind.AC),
         Energy4("total_energy", 10065, "Total Charged Energy", Kind.AC),
-        # Charger clock (read-only, packed bytes: high=year/day/min, low=month/hour/sec)
-        Integer("charger_time_ym", 10067, "Charger Clock (YY/MM)", "", Kind.AC),
-        Integer("charger_time_dh", 10068, "Charger Clock (DD/HH)", "", Kind.AC),
-        Integer("charger_time_ms", 10069, "Charger Clock (MM/SS)", "", Kind.AC),
+        # Charger clock (read-only, packed bytes)
+        PackedTimeSensor("charger_time_ym", 10067, "Charger Clock (Year/Month)", PackedTimeSensor._FMT_YM, Kind.AC),
+        PackedTimeSensor("charger_time_dh", 10068, "Charger Clock (Day/Hour)", PackedTimeSensor._FMT_DH, Kind.AC),
+        PackedTimeSensor("charger_time_ms", 10069, "Charger Clock (Min/Sec)", PackedTimeSensor._FMT_MS, Kind.AC),
         # Car connection and session info
         Enum2("car_connection", 10075, CAR_CONNECTION_MODES, "EV Connection", Kind.AC),
         Enum2("charge_start_mode", 10076, CHARGE_START_MODES, "Session Start Method", Kind.AC),
@@ -308,10 +341,10 @@ class HCA(Inverter):
         Long("charge_amount", 10061, "Session Charge Amount", "", Kind.AC),
         Long("charge_duration", 10063, "Session Duration", "s", Kind.AC),
         Energy4("total_energy", 10065, "Total Charged Energy", Kind.AC),
-        # Charger clock (read-only, packed bytes: high=year/day/min, low=month/hour/sec)
-        Integer("charger_time_ym", 10067, "Charger Clock (YY/MM)", "", Kind.AC),
-        Integer("charger_time_dh", 10068, "Charger Clock (DD/HH)", "", Kind.AC),
-        Integer("charger_time_ms", 10069, "Charger Clock (MM/SS)", "", Kind.AC),
+        # Charger clock (read-only, packed bytes)
+        PackedTimeSensor("charger_time_ym", 10067, "Charger Clock (Year/Month)", PackedTimeSensor._FMT_YM, Kind.AC),
+        PackedTimeSensor("charger_time_dh", 10068, "Charger Clock (Day/Hour)", PackedTimeSensor._FMT_DH, Kind.AC),
+        PackedTimeSensor("charger_time_ms", 10069, "Charger Clock (Min/Sec)", PackedTimeSensor._FMT_MS, Kind.AC),
         # Car connection and session info
         Enum2("car_connection", 10075, CAR_CONNECTION_MODES, "EV Connection", Kind.AC),
         Enum2("charge_start_mode", 10076, CHARGE_START_MODES, "Session Start Method", Kind.AC),
@@ -343,15 +376,15 @@ class HCA(Inverter):
     __sensors_block3: tuple[Sensor, ...] = (
         # Transparent mode: 0=IoT, 1=gateway
         Integer("transparent_mode", 10157, "Transparent Mode", "", Kind.AC),
-        # Last session start time (packed: high byte=year/day/min, low byte=month/hour/sec)
-        Integer("last_charge_start_ym", 10158, "Last Session Start (YY/MM)", "", Kind.AC),
-        Integer("last_charge_start_dh", 10159, "Last Session Start (DD/HH)", "", Kind.AC),
-        Integer("last_charge_start_ms", 10160, "Last Session Start (MM/SS)", "", Kind.AC),
+        # Last session start time (packed bytes)
+        PackedTimeSensor("last_charge_start_ym", 10158, "Last Session Start (Year/Month)", PackedTimeSensor._FMT_YM, Kind.AC),
+        PackedTimeSensor("last_charge_start_dh", 10159, "Last Session Start (Day/Hour)", PackedTimeSensor._FMT_DH, Kind.AC),
+        PackedTimeSensor("last_charge_start_ms", 10160, "Last Session Start (Min/Sec)", PackedTimeSensor._FMT_MS, Kind.AC),
         # 10161 reserved
         # Last session end time
-        Integer("last_charge_end_ym", 10162, "Last Session End (YY/MM)", "", Kind.AC),
-        Integer("last_charge_end_dh", 10163, "Last Session End (DD/HH)", "", Kind.AC),
-        Integer("last_charge_end_ms", 10164, "Last Session End (MM/SS)", "", Kind.AC),
+        PackedTimeSensor("last_charge_end_ym", 10162, "Last Session End (Year/Month)", PackedTimeSensor._FMT_YM, Kind.AC),
+        PackedTimeSensor("last_charge_end_dh", 10163, "Last Session End (Day/Hour)", PackedTimeSensor._FMT_DH, Kind.AC),
+        PackedTimeSensor("last_charge_end_ms", 10164, "Last Session End (Min/Sec)", PackedTimeSensor._FMT_MS, Kind.AC),
         # 10165 reserved
         # Session metrics
         Long("last_charge_duration", 10166, "Last Session Duration", "s", Kind.AC),
@@ -477,6 +510,16 @@ class HCA(Inverter):
         raise ValueError(f'Unknown sensor "{sensor_id}"')
 
     async def read_setting(self, setting_id: str) -> Any:
+        if setting_id == "hca_clock":
+            ym_r = await self._read_from_socket(self._read_command(10067, 1))
+            dh_r = await self._read_from_socket(self._read_command(10068, 1))
+            ms_r = await self._read_from_socket(self._read_command(10069, 1))
+            ym = int.from_bytes(ym_r.read(2), "big")
+            dh = int.from_bytes(dh_r.read(2), "big")
+            ms = int.from_bytes(ms_r.read(2), "big")
+            year = 2000 + ((ym >> 8) & 0xFF)
+            return datetime(year, ym & 0xFF, (dh >> 8) & 0xFF,
+                            dh & 0xFF, (ms >> 8) & 0xFF, ms & 0xFF)
         setting = self._settings_map.get(setting_id)
         if setting:
             count = (setting.size_ + (setting.size_ % 2)) // 2
@@ -488,6 +531,15 @@ class HCA(Inverter):
         raise ValueError(f'Unknown setting "{setting_id}"')
 
     async def write_setting(self, setting_id: str, value: Any):
+        if setting_id == "hca_clock":
+            dt = value if isinstance(value, datetime) else datetime.now()
+            ym = ((dt.year % 100) << 8) | dt.month
+            dh = (dt.day << 8) | dt.hour
+            ms = (dt.minute << 8) | dt.second
+            await self._read_from_socket(self._write_command(10071, ym))
+            await self._read_from_socket(self._write_command(10072, dh))
+            await self._read_from_socket(self._write_command(10073, ms))
+            return
         setting = self._settings_map.get(setting_id)
         if setting:
             raw_value = setting.encode_value(value)
