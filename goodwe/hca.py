@@ -153,15 +153,29 @@ class HCA(Inverter):
         Integer("battery_discharge_soc", 10030, "Battery Discharge SOC Limit", "%", Kind.BAT),
         Integer("completion_time", 10031, "Completion Time", "h", Kind.AC),
         Enum2("charging_mode_state", 10032, CHARGING_MODE_MODES, "Charging Mode", Kind.AC),
+        # Reservation mode mirror settings (10033-10038) - exposed as sensors
+        Enum2("charging_mode_reservation", 10033, CHARGING_MODE_MODES, "Charging Mode (Reservation)", Kind.AC),
+        Decimal("max_capacity_reservation", 10034, 10, "Max Charging Capacity (Reservation)", "kWh", Kind.AC),
+        Decimal("min_capacity_reservation", 10035, 10, "Min Charging Capacity (Reservation)", "kWh", Kind.AC),
+        Decimal("max_power_reservation", 10036, 10, "Max Charging Power (Reservation)", "kW", Kind.AC),
+        Integer("battery_soc_reservation", 10037, "Battery Discharge SOC (Reservation)", "%", Kind.BAT),
+        Integer("completion_time_reservation", 10038, "Completion Time (Reservation)", "h", Kind.AC),
         Decimal("grid_power_limit_state", 10039, 10, "Grid Power Limit", "kW", Kind.GRID),
         # Charge on/off state and session metrics
         Integer("charge_state", 10060, "Charge State", "", Kind.AC),
+        Long("charge_amount", 10061, "Session Charge Amount", "", Kind.AC),
         Long("charge_duration", 10063, "Session Duration", "s", Kind.AC),
         Energy4("total_energy", 10065, "Total Charged Energy", Kind.AC),
+        # Charger clock (read-only, packed bytes: high=year/day/min, low=month/hour/sec)
+        Integer("charger_time_ym", 10067, "Charger Clock (YY/MM)", "", Kind.AC),
+        Integer("charger_time_dh", 10068, "Charger Clock (DD/HH)", "", Kind.AC),
+        Integer("charger_time_ms", 10069, "Charger Clock (MM/SS)", "", Kind.AC),
         # Car connection and session info
         Enum2("car_connection", 10075, CAR_CONNECTION_MODES, "EV Connection", Kind.AC),
         Enum2("charge_start_mode", 10076, CHARGE_START_MODES, "Session Start Method", Kind.AC),
         Enum2("charging_strategy", 10077, CHARGING_STRATEGY_MODES, "Charging Strategy", Kind.AC),
+        Integer("charging_strategy_param", 10078, "Charging Strategy Parameter", "", Kind.AC),
+        Integer("appointment_sign", 10079, "Appointment Active", "", Kind.AC),
         # CP pilot voltage state
         Enum2("cp_voltage_state", 10084, CP_VOLTAGE_STATES, "CP Voltage State", Kind.AC),
     )
@@ -205,15 +219,29 @@ class HCA(Inverter):
         Integer("battery_discharge_soc", 10030, "Battery Discharge SOC Limit", "%", Kind.BAT),
         Integer("completion_time", 10031, "Completion Time", "h", Kind.AC),
         Enum2("charging_mode_state", 10032, CHARGING_MODE_MODES, "Charging Mode", Kind.AC),
+        # Reservation mode mirror settings (10033-10038) - exposed as sensors
+        Enum2("charging_mode_reservation", 10033, CHARGING_MODE_MODES, "Charging Mode (Reservation)", Kind.AC),
+        Decimal("max_capacity_reservation", 10034, 10, "Max Charging Capacity (Reservation)", "kWh", Kind.AC),
+        Decimal("min_capacity_reservation", 10035, 10, "Min Charging Capacity (Reservation)", "kWh", Kind.AC),
+        Decimal("max_power_reservation", 10036, 10, "Max Charging Power (Reservation)", "kW", Kind.AC),
+        Integer("battery_soc_reservation", 10037, "Battery Discharge SOC (Reservation)", "%", Kind.BAT),
+        Integer("completion_time_reservation", 10038, "Completion Time (Reservation)", "h", Kind.AC),
         Decimal("grid_power_limit_state", 10039, 10, "Grid Power Limit", "kW", Kind.GRID),
         # Charge on/off state and session metrics
         Integer("charge_state", 10060, "Charge State", "", Kind.AC),
+        Long("charge_amount", 10061, "Session Charge Amount", "", Kind.AC),
         Long("charge_duration", 10063, "Session Duration", "s", Kind.AC),
         Energy4("total_energy", 10065, "Total Charged Energy", Kind.AC),
+        # Charger clock (read-only, packed bytes: high=year/day/min, low=month/hour/sec)
+        Integer("charger_time_ym", 10067, "Charger Clock (YY/MM)", "", Kind.AC),
+        Integer("charger_time_dh", 10068, "Charger Clock (DD/HH)", "", Kind.AC),
+        Integer("charger_time_ms", 10069, "Charger Clock (MM/SS)", "", Kind.AC),
         # Car connection and session info
         Enum2("car_connection", 10075, CAR_CONNECTION_MODES, "EV Connection", Kind.AC),
         Enum2("charge_start_mode", 10076, CHARGE_START_MODES, "Session Start Method", Kind.AC),
         Enum2("charging_strategy", 10077, CHARGING_STRATEGY_MODES, "Charging Strategy", Kind.AC),
+        Integer("charging_strategy_param", 10078, "Charging Strategy Parameter", "", Kind.AC),
+        Integer("appointment_sign", 10079, "Appointment Active", "", Kind.AC),
         # CP pilot voltage state
         Enum2("cp_voltage_state", 10084, CP_VOLTAGE_STATES, "CP Voltage State", Kind.AC),
     )
@@ -279,9 +307,22 @@ class HCA(Inverter):
         Integer("completion_time_set", 10031, "Completion Time", "h"),
         # 0=fast charge, 1=PV only, 2=PV+battery
         Integer("advanced_charging_mode", 10032, "Advanced Charging Mode"),
+        # Reservation mode mirrors (10033-10038)
+        Integer("advanced_charging_mode_reservation", 10033, "Charging Mode (Reservation)"),
+        Decimal("max_capacity_reservation_set", 10034, 10, "Max Charging Capacity (Reservation)", "kWh"),
+        Decimal("min_capacity_reservation_set", 10035, 10, "Min Charging Capacity (Reservation)", "kWh"),
+        Decimal("max_charging_power_reservation", 10036, 10, "Max Charging Power (Reservation)", "kW"),
+        Integer("battery_discharge_soc_reservation", 10037, "Battery Discharge SOC (Reservation)", "%"),
+        Integer("completion_time_reservation_set", 10038, "Completion Time (Reservation)", "h"),
         Decimal("grid_power_limit", 10039, 10, "Grid Power Limit", "kW"),
         # Register 10060: 1=off, 2=on (non-standard values)
         SwitchValue("charge_enabled", 10060, "Charge Enabled", on_value=2, off_value=1),
+        # Charger clock set (RW, packed bytes same format as read at 10067-10069)
+        Integer("set_time_ym", 10071, "Set Charger Clock (YY/MM)"),
+        Integer("set_time_dh", 10072, "Set Charger Clock (DD/HH)"),
+        Integer("set_time_ms", 10073, "Set Charger Clock (MM/SS)"),
+        # Transparent mode: 0=IoT direct, 1=gateway
+        Integer("transparent_mode_set", 10157, "Transparent Mode"),
     )
 
     def __init__(self, host: str, port: int = GOODWE_TCP_PORT, comm_addr: int = 0xF7,
