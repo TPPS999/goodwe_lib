@@ -16,6 +16,62 @@ from .sensor import (
 logger = logging.getLogger(__name__)
 
 
+AC_FAULT_01_BITS: dict[int, str] = {
+    0: "Emergency stop",
+    1: "Overvoltage",
+    2: "Overcurrent",
+    3: "Undervoltage",
+    4: "Connector fault",
+    5: "S2 disconnected",
+    6: "Env overheating",
+    7: "Gun overheating",
+}
+
+AC_FAULT_02_BITS: dict[int, str] = {
+    0: "Door access fault",
+    1: "Grounding fault",
+    2: "Handshake timeout",
+    3: "RF card comm fault",
+    4: "Display comm fault",
+    5: "Meter IC comm fault",
+    6: "Output relay fault",
+    7: "Gun lock fault",
+}
+
+AC_FAULT_03_BITS: dict[int, str] = {
+    0: "Output short circuit",
+    1: "Leakage current",
+    2: "Charging pause >10min",
+    3: "Meter reading abnormal",
+    4: "Offline at PV/bat start",
+    5: "Insufficient PV/bat power",
+}
+
+AC_ALARM_05_BITS: dict[int, str] = {
+    0: "Gun overheating alarm",
+    1: "Grounding alarm",
+    2: "Handshake timeout alarm",
+    3: "RF card comm alarm",
+    4: "Display comm alarm",
+    5: "Meter IC comm alarm",
+    6: "Charging stop alarm",
+    7: "Meter reading abnormal",
+}
+
+AC_ALARM_06_BITS: dict[int, str] = {
+    0: "Env overheating alarm",
+}
+
+HW_FAULT_07_BITS: dict[int, str] = {
+    0: "External flash fault",
+    1: "EEPROM fault",
+    2: "Leak detection fault",
+    3: "Input power abnormal",
+    4: "SN not registered",
+    5: "Factory params abnormal",
+    6: "Unauthorized firmware",
+}
+
 CHARGER_STATUS_MODES: dict[int, str] = {
     0: "Idle",
     1: "Idle (plugged)",
@@ -75,6 +131,26 @@ CP_VOLTAGE_STATES: dict[int, str] = {
 }
 
 
+class FaultBitmaskSensor(Sensor):
+    """Sensor representing a fault/alarm register as human-readable text.
+
+    Decodes each set bit into its corresponding description.
+    Returns comma-separated list of active faults, or 'OK' if register is zero.
+    """
+
+    def __init__(self, id_: str, offset: int, name: str, labels: dict[int, str],
+                 kind: Optional[Kind] = None):
+        super().__init__(id_, offset, name, 2, "", kind)
+        self._labels = labels
+
+    def read_value(self, data: ProtocolResponse) -> str:
+        raw = read_bytes2(data, undef=0)
+        if not raw:
+            return "OK"
+        active = [label for bit, label in self._labels.items() if raw & (1 << bit)]
+        return ", ".join(active) if active else "OK"
+
+
 class PowerSourceSensor(Sensor):
     """Sensor representing charging power source as human-readable text.
 
@@ -114,15 +190,15 @@ class HCA(Inverter):
     # Block 1 sensors (10000-10084) - 3-phase variant
     # -------------------------------------------------------------------------
     __sensors_block1_3phase: tuple[Sensor, ...] = (
-        # Fault/alarm status registers (bitmasks - non-zero means fault/alarm active)
-        Integer("ac_fault_01", 10001, "EV Charger AC Fault 1", "", Kind.AC),
-        Integer("ac_fault_02", 10002, "EV Charger AC Fault 2", "", Kind.AC),
-        Integer("ac_fault_03", 10003, "EV Charger AC Fault 3", "", Kind.AC),
-        Integer("ac_fault_04", 10004, "EV Charger AC Fault 4", "", Kind.AC),
-        Integer("ac_alarm_05", 10005, "EV Charger AC Alarm 1", "", Kind.AC),
-        Integer("ac_alarm_06", 10006, "EV Charger AC Alarm 2", "", Kind.AC),
-        Integer("hw_fault_07", 10007, "EV Charger HW Fault 1", "", Kind.AC),
-        Integer("hw_fault_08", 10008, "EV Charger HW Fault 2", "", Kind.AC),
+        # Fault/alarm status registers - decoded bitmasks
+        FaultBitmaskSensor("ac_fault_01", 10001, "EV Charger AC Fault 1", AC_FAULT_01_BITS, Kind.AC),
+        FaultBitmaskSensor("ac_fault_02", 10002, "EV Charger AC Fault 2", AC_FAULT_02_BITS, Kind.AC),
+        FaultBitmaskSensor("ac_fault_03", 10003, "EV Charger AC Fault 3", AC_FAULT_03_BITS, Kind.AC),
+        Integer("ac_fault_04", 10004, "EV Charger AC Fault 4 (Reserved)", "", Kind.AC),
+        FaultBitmaskSensor("ac_alarm_05", 10005, "EV Charger AC Alarm 1", AC_ALARM_05_BITS, Kind.AC),
+        FaultBitmaskSensor("ac_alarm_06", 10006, "EV Charger AC Alarm 2", AC_ALARM_06_BITS, Kind.AC),
+        FaultBitmaskSensor("hw_fault_07", 10007, "EV Charger HW Fault 1", HW_FAULT_07_BITS, Kind.AC),
+        Integer("hw_fault_08", 10008, "EV Charger HW Fault 2 (Reserved)", "", Kind.AC),
         # AC measurements - 3-phase
         Voltage("voltage_a", 10009, "Charge Voltage L1", Kind.AC),
         Voltage("voltage_b", 10010, "Charge Voltage L2", Kind.AC),
