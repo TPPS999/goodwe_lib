@@ -1,7 +1,7 @@
 # Plan działania - goodwe_lib
 
 **Data rozpoczęcia:** 2026-01-24 18:32
-**Ostatnia aktualizacja:** 2026-02-19 19:09
+**Ostatnia aktualizacja:** 2026-10-06 23:21
 
 ---
 
@@ -38,7 +38,84 @@
   - ✅ **Auto-disable logic usunięta** - błędy Modbus nie nadpisują zapisanego stanu
   - ⚠️ **Wymaga restartu HA** po włączeniu/wyłączeniu switcha (to jest OK)
 
-### Ostatnie zmiany (2026-01-31 12:30)
+### Ostatnie zmiany (2026-02-20 00:57)
+- ✅ **v0.9.9.78** - REFACTOR: Modułowa architektura price plans (BREAKING CHANGE)
+  - **Motywacja:** User feedback - "integracja sie rozrasta, moze lepiej zrobic maske wprowadzania decyzji cenowej z innych integracji"
+  - **Problem:** goodwe integration mieszała Modbus communication + price logic (PSE API, entity extraction, scheduling)
+  - **Rozwiązanie:** Clean separation of concerns - każda integracja robi JEDNĄ rzecz
+
+  - **USUNIĘTO** (~280 linii):
+    - PSE API integration (_fetch_pse_prices, constants)
+    - Entity price extraction (_extract_prices)
+    - configure_neg_price_plan service
+    - update_neg_price_plans service
+    - Auto-update scheduling dla PSE
+    - source_type logic (entity/rce_warsaw)
+    - Cache w runtime_data
+
+  - **ZOSTAŁO** (~300 linii):
+    - build_mask() helper function (może być skopiowane przez external integrations)
+    - set_neg_price_plan service (low-level: przyjmuje maski lub prices+threshold)
+    - _midnight_rollover() - uproszczona wersja czytająca sensory
+    - encode_rtc_date() helper
+    - neg_price_enable switch
+
+  - **DODANO:**
+    - 4 sensory pokazujące aktualne maski (JSON arrays):
+      * sensor.goodwe_neg_price_sell_today_mask
+      * sensor.goodwe_neg_price_sell_tomorrow_mask
+      * sensor.goodwe_neg_price_buy_today_mask
+      * sensor.goodwe_neg_price_buy_tomorrow_mask
+    - NegPriceMaskSensor class w sensor.py (czyta 6 rejestrów → JSON)
+    - PRICE_OPTIMIZER_GUIDE.md - pełny guide dla external integrations (+550 linii)
+
+  - **Nowa architektura:**
+    - **GoodWe integration**: Modbus communication + low-level service + midnight rollover
+    - **Price Optimizer integration** (external, przyszła): price logic + scheduling + wywołuje goodwe service
+    - Przykłady: pse_price_optimizer, nordpool_price_optimizer, ml_price_optimizer
+
+  - **Midnight rollover (zmienione):**
+    - Nie czyta z cache (cache removed)
+    - Czyta sensory tomorrow_mask (JSON parse)
+    - Zapisuje jako today_mask (Modbus write)
+    - Clearuje tomorrow_mask → [0,0,0,0,0,0]
+
+  - **Pliki zmienione:**
+    - price_plan.py: -280 +65 = -215 net lines
+    - sensor.py: +60 lines (4 mask sensors)
+    - const.py: -2 lines (removed unused service constants)
+    - services.yaml: -135 lines (removed configure/update definitions)
+    - manifest.json: v0.9.9.77 → v0.9.9.78
+    - PRICE_OPTIMIZER_GUIDE.md: NEW +550 lines
+
+  - **Commit:** 21c78e1
+  - **Breaking change:** configure_neg_price_plan i update_neg_price_plans usunięte
+  - **Migration:** Użytkownicy PSE API muszą poczekać na external pse_price_optimizer integration
+  - **Korzyści:** Scalable, maintainable, clean separation, łatwo dodać nowe źródła cen
+
+### Poprzednie zmiany (2026-02-20 00:39)
+- ✅ **v0.9.9.77** - Midnight rollover dla price plans
+  - **Problem:** O północy "jutro" staje się "dzisiaj", ale rejestry się nie przesuwają automatycznie
+  - **User feedback:** "o polnocy musimy przepisac je na dzis, bo to sie robi nasze jutro"
+  - **Rozwiązanie:**
+    - Dodano `_midnight_rollover()` handler (trigger 00:00:30 daily)
+    - Cache prices w runtime_data: `last_price_today`, `last_price_tomorrow`
+    - O północy: cached yesterday's tomorrow → build today masks → write to inverter
+    - Tomorrow zostaje puste do 14:30 (PSE auto-update)
+  - **Przepływ dzienny:**
+    1. 00:00:30 - Midnight rollover (yesterday's tomorrow → today)
+    2. 14:30+ - PSE auto-update (fetch today + tomorrow, cache both)
+    3. Retry co 30 min do 23:30 jeśli tomorrow brak
+  - **Zmiany w price_plan.py:**
+    - New: `_midnight_rollover()` - async handler
+    - Updated: `_update_from_config()` - dodano `runtime_data` param + caching
+    - Updated: `_setup_auto_update_schedule()` - dodano midnight trigger
+    - Updated: wszystkie wywołania _update_from_config() przekazują runtime_data
+  - **Commit:** 4c9f2e3
+  - **Działa dla:** RCE Warsaw i Entity source types
+  - **Uwaga:** Separate buy/sell thresholds już były od v0.9.9.76 (user miał wątpliwości, ale to już działało)
+
+### Poprzednie zmiany (2026-01-31 12:30)
 - ✅ **v0.6.3 + custom component v0.9.9.51** - Fix peak_shaving_power_slot8 unit
   - **Problem:** Rejestr 47592 oczekuje wartosci w watach, nie kW
   - **Rozwiazanie:** Zmiana z KILO_WATT na WATT
@@ -84,6 +161,34 @@
   - Znaleziono w produkcji: slot 1 używał mode 0xF9 (nieznany enum)
   - Dodano BATTERY_POWER_PERMILLAGE = 0xF9 do WorkWeekMode
   - Commit: 6498ae2 (v0.5.8), 0ea28f6 (custom component)
+
+### Audyt prac (2026-10-06 23:21)
+
+**Było:** to_do.md zatrzymane na 2026-02-20 (v0.6.x / komponent 0.9.9.78).
+**Jest:** lib v0.8.7 (e645e5b, 2026-04-01), komponent v0.9.9.87 (145b34d). Oba repo == origin.
+**Uzupełnienie brakującej historii (z git log):**
+- ✅ v0.7.0 - usunięte observation sensors (0f53a4f) - sekcja 0 poniżej jest historyczna
+- ✅ v0.7.1-0.7.2 - poprawione rejestry 32-bit power, reactive energy
+- ✅ v0.7.3 - rejestry FW 2025, v0.7.4 - negative price plan, v0.7.5 - filtr reactive + fix peak shaving switch
+- ✅ v0.7.6 - nie usuwamy settings przy przejściowych błędach odczytu
+- ✅ v0.8.0-0.8.7 - ładowarka HCA (EV charger): G2 rejestry, FaultBitmaskSensor, PackedTimeSensor, hca_clock sync
+- ✅ komponent 0.9.9.79-0.9.9.87 - limity baterii 200A, encje HCA, tłumaczenia, clock sync
+
+**Ustalenia audytu (do zrobienia):**
+- ⏳ A1. Na HA Radzyny działa komponent 567e72a (0.9.9.80 / lib v0.7.6) - HCA i v0.8.x niewdrożone (decyzja usera)
+- ⏳ A2. Testy: 8 FAIL w test_et.py - tylko nieaktualne liczniki sensorów (np. 168 != 201); brak testów HCA
+- ⏳ A3. Tag v0.8.0 ma VERSION=0.7.6 (od v0.8.1 zgodne) - nie używać @v0.8.0
+- ⏳ A4. 5 nieśledzonych extract_regs*.py w root (2026-02-19) - przenieść do docs/scripts albo usunąć
+- ⏳ A5. Komponent __init__.py: `_version_mismatch` niezdefiniowane gdy requirement bez `@vX.Y.Z` -> NameError (naprawić w Z-002)
+- ⏳ A6. Sekcje X i 5.6 wiszą jako "W TRAKCIE" od lutego - zweryfikować czy aktualne
+- ℹ️ A7. to_do.md w .gitignore jako "local only", ale śledzony i pushowany na GitHub
+
+**Zalecenia z haos_radzyny (zalecenia.md):**
+- ⏳ **Z-002** [goodwe fork][goodwe_lib] - wersja komponentu + lib + commit/data w API - status `nowe`
+  - lib: `__version__` (importlib.metadata + setup.cfg `version: file: VERSION`) działa - bez zmian
+  - fork: `sensor.goodwe_integration_version` (diagnostic, 1 na instancję) + atrybuty lib_version/lib_expected/lib_match
+  - fork: GitHub release przy każdym podbiciu manifestu -> HACS pokaże vX.Y.Z zamiast hasha
+- Context: context_record/202610062321_context.md
 
 ### Bieżące działania (2026-02-19)
 
@@ -407,6 +512,12 @@ Wszystkie zasady pracy są opisane w [CLAUDE.md](CLAUDE.md):
 ---
 
 ## Historia zmian planu
+
+### 2026-10-06 23:21 - Audyt prac + przegląd zalecenia.md (haos_radzyny)
+- ✅ Uzupełniona historia v0.7.0-v0.8.7 / komponent 0.9.9.79-0.9.9.87 (z git log)
+- ✅ Ustalenia audytu A1-A7 (sekcja "Audyt prac")
+- ✅ Przegląd zalecenia.md: dla nas tylko Z-002 (status `nowe`), reszta to battery_balancer
+- Backup: to_do/202610062321_to_do.md
 
 ### 2026-02-03 11:39 - Reverse engineering: Znalezienie rejestrów Modbus dla master i slave
 - 🚧 **W TRAKCIE:** Analiza scan logów w celu znalezienia rejestrów odpowiadających za ustawienia
